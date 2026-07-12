@@ -106,6 +106,7 @@
   .card-acts .row-btn:hover{opacity:1;}
   .card-field{font-size:12.5px; margin-bottom:7px; line-height:1.45; white-space:pre-wrap;}
   .card-field .lbl{display:block; font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); font-weight:600; margin-bottom:1px;}
+  .card-num{color:var(--muted); font-weight:700; font-size:12.5px;}
   .usecount{font-size:11px; color:var(--muted);}
   .yes{color:var(--green); font-weight:700;} .no{color:var(--muted);}
   .overlay{position:fixed; inset:0; background:rgba(40,35,25,.45); display:none; align-items:center; justify-content:center; z-index:10;}
@@ -215,6 +216,7 @@
       <div class="toolbar">
         <span class="hint" style="color:var(--muted); font-size:13px">Define los campos de cada componente. «Habilidades» y «Ecosistemas» son tipos de campo: agrégalos donde los necesites y configúralos aquí.</span>
         <span class="spacer"></span>
+        <label style="font-size:13px;color:var(--muted);display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer"><input type="checkbox" id="chkCardNum" style="width:auto" onchange="toggleCardNum(this.checked)"> Este tipo usa N° de carta</label>
         <button class="btn primary" onclick="addField()">+ Nuevo campo</button>
       </div>
       <div class="table-wrap">
@@ -429,7 +431,7 @@ function pushCloud(){
 }
 
 let state=load();
-let editingId=null, editValues={};
+let editingId=null, editValues={}, editNumVal=null, editCardVal='';
 let sortKey=null, sortDir=1, filterState={}, exportFmt='texto', currentView='componentes';
 let libFieldId=null, setFieldId=null;
 const selected=new Set();
@@ -438,6 +440,8 @@ let typeOpened=false, promptCb=null, dupTypeId=null;
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function fid(){ return 'f_'+Math.random().toString(36).slice(2,8); }
 function newType(name){ return {id:uid(), name, fields:[{id:fid(), label:'Nombre', type:'text', primary:true}], components:[], colW:{}}; }
+function nextNum(t){ let m=0; t.components.forEach(c=>{ const n=+c.num; if(Number.isFinite(n)&&n>m)m=n; }); return m+1; }
+function nextCardNum(t){ let m=0; t.components.forEach(c=>{ const n=+c.cardNum; if(Number.isFinite(n)&&n>m)m=n; }); return m+1; }
 function newProject(name){ const t=newType('Componente 1'); return {id:uid(), name, types:[t], activeTypeId:t.id}; }
 function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2200); }
@@ -484,6 +488,8 @@ function migrateType(t){
   if(!t.fields.some(f=>f.primary)&&t.fields.length) t.fields[0].primary=true;
   if(!t.colW)t.colW={};
   if(!t.id)t.id=uid();
+  let _mx=0; t.components.forEach(c=>{ const n=+c.num; if(Number.isFinite(n)&&n>_mx)_mx=n; });
+  t.components.forEach(c=>{ const n=+c.num; if(Number.isFinite(n)&&n>0)c.num=n; else { _mx++; c.num=_mx; } });
   return t;
 }
 function migrateProject(p){
@@ -527,10 +533,11 @@ function visibleComponents(){
   const q=document.getElementById('search').value.trim().toLowerCase(); const p=curType();
   let list=p.components.filter(c=>{
     for(const k in filterState){ const f=fieldById(k); if(f&&filterState[k]&&cellText(c,f)!==filterState[k])return false; }
-    if(q){ if(!p.fields.map(f=>cellText(c,f)).join(' ').toLowerCase().includes(q))return false; }
+    if(q){ if(!(p.fields.map(f=>cellText(c,f)).join(' ')+' '+(c.num??'')+' '+(c.cardNum??'')).toLowerCase().includes(q))return false; }
     return true;
   });
-  if(sortKey){ const f=fieldById(sortKey); list=[...list].sort((a,b)=>{ if(f&&f.type==='number')return ((+valOf(a,f)||0)-(+valOf(b,f)||0))*sortDir; return cellText(a,f||{}).localeCompare(cellText(b,f||{}),'es')*sortDir; }); }
+  if(sortKey==='_num'||sortKey==='_cardnum'){ const k=(sortKey==='_num')?'num':'cardNum'; list=[...list].sort((a,b)=>((+a[k]||0)-(+b[k]||0))*sortDir); }
+  else if(sortKey){ const f=fieldById(sortKey); list=[...list].sort((a,b)=>{ if(f&&f.type==='number')return ((+valOf(a,f)||0)-(+valOf(b,f)||0))*sortDir; return cellText(a,f||{}).localeCompare(cellText(b,f||{}),'es')*sortDir; }); }
   return list;
 }
 function setSort(k){ if(sortKey===k)sortDir*=-1; else {sortKey=k;sortDir=1;} render(); }
@@ -571,10 +578,14 @@ function renderComponents(){
   p.fields.filter(f=>f.type==='select').forEach(f=>{ const vals=[...new Set(p.components.map(c=>valOf(c,f)).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'es')); const cur=filterState[f.id]||''; df.innerHTML+='<select onchange="setFilter(\''+f.id+'\',this.value)"><option value="">'+esc(f.label)+': todos</option>'+vals.map(v=>'<option '+(v===cur?'selected':'')+'>'+esc(v)+'</option>').join('')+'</select> '; });
   const list=visibleComponents();
   let head='<tr><th class="nosort"><input type="checkbox" id="selAll" onchange="toggleAll(this)"><span class="rsz" onmousedown="startResize(event,\'sel\')" onclick="event.stopPropagation()"></span></th>';
+  head+='<th onclick="setSort(\'_num\')">N°<span class="rsz" onmousedown="startResize(event,\'num\')" onclick="event.stopPropagation()"></span></th>';
+  if(p.useCardNum) head+='<th onclick="setSort(\'_cardnum\')">N° carta<span class="rsz" onmousedown="startResize(event,\'cardnum\')" onclick="event.stopPropagation()"></span></th>';
   p.fields.forEach(f=> head+='<th onclick="setSort(\''+f.id+'\')">'+esc(f.label)+(f.primary?' ★':'')+'<span class="rsz" onmousedown="startResize(event,\''+f.id+'\')" onclick="event.stopPropagation()"></span></th>');
   head+='<th class="nosort">Resumen<span class="rsz" onmousedown="startResize(event,\'resumen\')" onclick="event.stopPropagation()"></span></th><th class="nosort"><span class="rsz" onmousedown="startResize(event,\'acc\')" onclick="event.stopPropagation()"></span></th></tr>';
   const rcField=p.fields.find(f=>f.rowColor&&(f.type==='select'||f.type==='multiselect'));
   const rows=list.map(c=>{ let rs=''; if(rcField){ let rv=valOf(c,rcField); if(Array.isArray(rv))rv=rv[0]; const col=(rcField.colors||{})[rv]; if(col)rs=' style="background:'+hexA(col,0.13)+'"'; } let r='<tr'+rs+'><td><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onchange="toggleSel(\''+c.id+'\',this)"></td>';
+    r+='<td class="ec" style="color:var(--muted);font-weight:600" ondblclick="editNum(this,\''+c.id+'\',\'num\')">'+(c.num??'')+'</td>';
+    if(p.useCardNum) r+='<td class="ec" style="color:var(--muted);font-weight:600" ondblclick="editNum(this,\''+c.id+'\',\'cardNum\')">'+(c.cardNum??'')+'</td>';
     p.fields.forEach(f=> r+=cellHtml(c,f));
     r+=summaryHtml(c);
     r+='<td style="white-space:nowrap"><button class="row-btn" title="Editar" onclick="openEdit(\''+c.id+'\')">✎</button><button class="row-btn" title="Duplicar" onclick="duplicate(\''+c.id+'\')">⧉</button><button class="row-btn" title="Eliminar" onclick="removeOne(\''+c.id+'\')">🗑</button></td></tr>';
@@ -607,14 +618,14 @@ function cardHtml(c,p,rcField){
   const tf=p.fields.find(f=>f.primary);
   const title=tf?(valOf(c,tf)||'(sin título)'):'(sin título)';
   let h='<div class="card-c"'+st+' ondblclick="openEdit(\''+c.id+'\')">';
-  h+='<div class="card-head"><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onclick="event.stopPropagation()" ondblclick="event.stopPropagation()" onchange="toggleSel(\''+c.id+'\',this)"><span class="card-title">'+esc(title)+'</span><span class="card-acts" ondblclick="event.stopPropagation()"><button class="row-btn" title="Copiar resumen" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button><button class="row-btn" title="Editar" onclick="event.stopPropagation();openEdit(\''+c.id+'\')">✎</button><button class="row-btn" title="Duplicar" onclick="event.stopPropagation();duplicate(\''+c.id+'\')">⧉</button><button class="row-btn" title="Eliminar" onclick="event.stopPropagation();removeOne(\''+c.id+'\')">🗑</button></span></div>';
+  h+='<div class="card-head"><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onclick="event.stopPropagation()" ondblclick="event.stopPropagation()" onchange="toggleSel(\''+c.id+'\',this)"><span class="card-title"><span class="card-num">#'+(c.num??'')+'</span> '+esc(title)+(p.useCardNum&&c.cardNum!=null?' <span class="icon-tag" title="N° de carta">Carta '+c.cardNum+'</span>':'')+'</span><span class="card-acts" ondblclick="event.stopPropagation()"><button class="row-btn" title="Copiar resumen" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button><button class="row-btn" title="Editar" onclick="event.stopPropagation();openEdit(\''+c.id+'\')">✎</button><button class="row-btn" title="Duplicar" onclick="event.stopPropagation();duplicate(\''+c.id+'\')">⧉</button><button class="row-btn" title="Eliminar" onclick="event.stopPropagation();removeOne(\''+c.id+'\')">🗑</button></span></div>';
   p.fields.forEach(f=>{ if(f===tf)return; const vh=cardValHtml(c,f); if(vh===''||vh==null)return; h+='<div class="card-field"><span class="lbl">'+esc(f.label)+'</span>'+vh+'</div>'; });
   return h+'</div>';
 }
-function colDefault(key){ if(key==='sel')return 34; if(key==='acc')return 90; if(key==='resumen')return 320; const f=fieldById(key); if(!f)return 150; return ({number:70,check:60,select:140,long:240,abilities:240,icons:150,multiselect:170,list:150})[f.type]||150; }
+function colDefault(key){ if(key==='sel')return 34; if(key==='num')return 56; if(key==='cardnum')return 80; if(key==='acc')return 90; if(key==='resumen')return 320; const f=fieldById(key); if(!f)return 150; return ({number:70,check:60,select:140,long:240,abilities:240,icons:150,multiselect:170,list:150})[f.type]||150; }
 function colWidth(key){ const p=curType(); return (p.colW&&p.colW[key])||colDefault(key); }
-function tableWidth(){ const p=curType(); let s=colWidth('sel'); p.fields.forEach(f=>s+=colWidth(f.id)); return s+colWidth('resumen')+colWidth('acc'); }
-function colgroup(){ const p=curType(); let g='<colgroup><col id="col_sel" style="width:'+colWidth('sel')+'px">'; p.fields.forEach(f=>g+='<col id="col_'+f.id+'" style="width:'+colWidth(f.id)+'px">'); g+='<col id="col_resumen" style="width:'+colWidth('resumen')+'px"><col id="col_acc" style="width:'+colWidth('acc')+'px"></colgroup>'; return g; }
+function tableWidth(){ const p=curType(); let s=colWidth('sel')+colWidth('num')+(p.useCardNum?colWidth('cardnum'):0); p.fields.forEach(f=>s+=colWidth(f.id)); return s+colWidth('resumen')+colWidth('acc'); }
+function colgroup(){ const p=curType(); let g='<colgroup><col id="col_sel" style="width:'+colWidth('sel')+'px"><col id="col_num" style="width:'+colWidth('num')+'px">'; if(p.useCardNum)g+='<col id="col_cardnum" style="width:'+colWidth('cardnum')+'px">'; p.fields.forEach(f=>g+='<col id="col_'+f.id+'" style="width:'+colWidth(f.id)+'px">'); g+='<col id="col_resumen" style="width:'+colWidth('resumen')+'px"><col id="col_acc" style="width:'+colWidth('acc')+'px"></colgroup>'; return g; }
 let rz=null;
 function startResize(e,key){ e.preventDefault(); e.stopPropagation(); rz={key,x:e.clientX,w:colWidth(key)}; document.addEventListener('mousemove',onResize); document.addEventListener('mouseup',endResize); document.body.style.cursor='col-resize'; }
 function onResize(e){ if(!rz)return; const p=curType(); if(!p.colW)p.colW={}; const w=Math.max(40, rz.w+(e.clientX-rz.x)); p.colW[rz.key]=w; const col=document.getElementById('col_'+rz.key); if(col)col.style.width=w+'px'; const t=document.getElementById('compTable'); if(t)t.style.width=tableWidth()+'px'; }
@@ -653,6 +664,15 @@ function editCell(td,cid,fidId){
   const commit=(sav)=>{ if(done)return; done=true; if(sav){ let val=input.value; if(f.type==='number')val=val===''?'':+val; else if(f.type==='list')val=splitList(val); if(val===''||(Array.isArray(val)&&!val.length))delete c.values[fidId]; else c.values[fidId]=val; save(); } render(); };
   input.addEventListener('blur',()=>commit(true));
   input.addEventListener('keydown',e=>{ if(e.key==='Enter'&&f.type!=='long'){ e.preventDefault(); commit(true); } else if(e.key==='Escape')commit(false); });
+}
+function editNum(td,cid,key){
+  const c=curType().components.find(x=>x.id===cid); if(!c)return;
+  const input=document.createElement('input'); input.type='number'; input.value=(c[key]??''); input.className='cell-edit';
+  td.innerHTML=''; td.appendChild(input); input.focus(); input.select();
+  let done=false;
+  const commit=(sav)=>{ if(done)return; done=true; if(sav){ const v=input.value; if(v===''){ if(key==='cardNum')delete c.cardNum; } else c[key]=+v; save(); } render(); };
+  input.addEventListener('blur',()=>commit(true));
+  input.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); commit(true); } else if(e.key==='Escape')commit(false); });
 }
 function setFilter(k,val){ if(val)filterState[k]=val; else delete filterState[k]; render(); }
 function toggleSel(id,cb){ cb.checked?selected.add(id):selected.delete(id); render(); }
@@ -697,7 +717,9 @@ function renderFields(){
       '<td style="white-space:nowrap"><button class="row-btn" title="Duplicar campo" onclick="duplicateField(\''+f.id+'\')">⧉</button><button class="row-btn" onclick="deleteField(\''+f.id+'\')">🗑</button></td></tr>';
   }).join('');
   document.getElementById('fieldEmpty').style.display=p.fields.length?'none':'';
+  const ck=document.getElementById('chkCardNum'); if(ck)ck.checked=!!p.useCardNum;
 }
+function toggleCardNum(on){ const t=curType(); if(on){ t.useCardNum=true; if(!t.components.some(c=>c.cardNum!=null)){ t.components.forEach((c,i)=>{c.cardNum=i+1;}); toast(t.components.length?('N° de carta activado: numeradas 1 a '+t.components.length):'N° de carta activado'); } else toast('N° de carta activado'); } else { delete t.useCardNum; toast('N° de carta desactivado (los números se conservan, solo se ocultan)'); } save(); render(); }
 function addField(){ curType().fields.push({id:fid(),label:'Nuevo campo',type:'text'}); save(); renderFields(); }
 function updateField(id,field,val){
   const f=fieldById(id); if(!f)return;
@@ -770,7 +792,13 @@ function fieldInputHtml(f){
   if(f.type==='multiselect'){ const arr=Array.isArray(v)?v:[]; const opts=(f.options||[]).map(o=>'<span class="ms-opt '+(arr.includes(o)?'on':'')+'" onclick="toggleMultiVal(\''+f.id+'\',\''+esc(o).replace(/'/g,"\\'")+'\')">'+esc(o)+'</span>').join(''); return '<div class="fld">'+lab+'<div class="ms-box">'+(opts||'<span class="usecount">Sin opciones. Agrégalas en Campos.</span>')+'</div></div>'; }
   return '<div class="fld">'+lab+'<input type="text" value="'+esc(v||'')+'" oninput="setVal(\''+f.id+'\',this.value)"></div>';
 }
-function renderFieldInputs(){ document.getElementById('fFields').innerHTML=curType().fields.map(fieldInputHtml).join(''); }
+function renderFieldInputs(){
+  const t=curType();
+  let top='<div class="grid2"><div class="fld"><label class="flabel">N° ID</label><input type="number" value="'+(editNumVal??'')+'" oninput="editNumVal=this.value===\'\'?null:+this.value"></div>';
+  top+=(t.useCardNum?'<div class="fld"><label class="flabel">N° de carta</label><input type="number" value="'+(editCardVal===''?'':editCardVal)+'" oninput="editCardVal=this.value===\'\'?\'\':+this.value"></div>':'<div></div>');
+  top+='</div>';
+  document.getElementById('fFields').innerHTML=top+t.fields.map(fieldInputHtml).join('');
+}
 function setVal(id,val){ editValues[id]=val; }
 function toggleMultiVal(id,opt){ let a=Array.isArray(editValues[id])?editValues[id]:[]; a=a.includes(opt)?a.filter(x=>x!==opt):[...a,opt]; editValues[id]=a; renderFieldInputs(); }
 function toggleAbilityVal(id,abId,on){ let a=Array.isArray(editValues[id])?editValues[id]:[]; if(on){ if(!a.includes(abId))a.push(abId); } else a=a.filter(x=>x!==abId); editValues[id]=a; }
@@ -779,6 +807,7 @@ function quickAddAbilityField(id){ const f=fieldById(id); if(!f)return; const t=
 function openEdit(id){
   editingId=(typeof id==='string')?id:null; const c=editingId?curType().components.find(x=>x.id===editingId):null;
   document.getElementById('mEditTitle').textContent=c?'Editar componente':'Agregar componente';
+  editNumVal=c?c.num:nextNum(curType()); editCardVal=(c&&c.cardNum!=null)?c.cardNum:'';
   editValues={};
   curType().fields.forEach(f=>{ const v=c?c.values[f.id]:undefined;
     if(f.type==='icons'){ const m={}; (Array.isArray(v)?v:[]).forEach(x=>m[x.tipo]=x.cantidad); editValues[f.id]=m; }
@@ -796,11 +825,11 @@ function saveEdit(){
     if(f.type==='abilities'){ const arr=(Array.isArray(v)?v:[]).filter(id=>(f.library||[]).some(a=>a.id===id)); if(arr.length)values[f.id]=arr; return; }
     if(v===undefined||v===''||v===null)return; if(Array.isArray(v)&&!v.length)return; values[f.id]=v;
   });
-  if(editingId){ const c=p.components.find(x=>x.id===editingId); c.values=values; toast('Componente actualizado'); }
-  else { p.components.push({id:uid(),values}); toast('Componente agregado'); }
+  if(editingId){ const c=p.components.find(x=>x.id===editingId); c.values=values; if(editNumVal!=null&&editNumVal!=='')c.num=+editNumVal; if(p.useCardNum){ if(editCardVal===''||editCardVal==null)delete c.cardNum; else c.cardNum=+editCardVal; } toast('Componente actualizado'); }
+  else { const nc={id:uid(),num:(editNumVal!=null&&editNumVal!=='')?+editNumVal:nextNum(p),values}; if(p.useCardNum&&editCardVal!==''&&editCardVal!=null)nc.cardNum=+editCardVal; p.components.push(nc); toast('Componente agregado'); }
   save(); closeModal('mEdit'); render();
 }
-function duplicate(id){ const p=curType(); const c=p.components.find(x=>x.id===id); const pf=primaryField(); const nv=JSON.parse(JSON.stringify(c.values||{})); if(pf)nv[pf.id]=(nv[pf.id]||'')+' (copia)'; p.components.splice(p.components.indexOf(c)+1,0,{id:uid(),values:nv}); save(); render(); }
+function duplicate(id){ const p=curType(); const c=p.components.find(x=>x.id===id); const pf=primaryField(); const nv=JSON.parse(JSON.stringify(c.values||{})); if(pf)nv[pf.id]=(nv[pf.id]||'')+' (copia)'; const nc={id:uid(),num:nextNum(p),values:nv}; if(p.useCardNum&&c.cardNum!=null)nc.cardNum=nextCardNum(p); p.components.splice(p.components.indexOf(c)+1,0,nc); save(); render(); }
 function removeOne(id){ const c=curType().components.find(x=>x.id===id); if(!confirm('¿Eliminar "'+titleOf(c)+'"?'))return; curType().components=curType().components.filter(x=>x.id!==id); selected.delete(id); save(); render(); }
 
 /* ---------- Lote ---------- */
@@ -810,7 +839,7 @@ function saveBulkAdd(){
   const lines=document.getElementById('bulkText').value.split('\n').map(l=>l.replace(/\r$/,'')).filter(l=>l.trim()); let added=0;
   for(const line of lines){ const cols=line.includes('\t')?line.split('\t'):line.split(' | '); const values={};
     simple.forEach((f,i)=>{ let raw=(cols[i]||'').trim(); if(!raw)return; if(f.type==='number')values[f.id]=+raw||0; else if(f.type==='check')values[f.id]=/^(s[ií]|x|1|true|yes)$/i.test(raw); else if(f.type==='list'||f.type==='multiselect')values[f.id]=splitList(raw); else values[f.id]=raw; });
-    if(!values[pf.id])continue; p.components.push({id:uid(),values}); added++;
+    if(!values[pf.id])continue; const nc={id:uid(),num:nextNum(p),values}; if(p.useCardNum)nc.cardNum=nextCardNum(p); p.components.push(nc); added++;
   }
   save(); closeModal('mBulkAdd'); render(); toast(added+' componentes agregados');
 }
