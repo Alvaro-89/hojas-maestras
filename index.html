@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Componentes de Juegos</title>
+<style>
+  :root{
+    --bg:#f4f2ec; --panel:#ffffff; --ink:#2b2a26; --muted:#8a8578;
+    --accent:#c05621; --accent-soft:#fdf0e7; --line:#e5e1d6;
+    --green:#2f7d4f; --green-soft:#e6f2ea; --blue:#2b6cb0; --blue-soft:#e8f0fa;
+    --yellow:#b7791f; --yellow-soft:#fbf3e0; --gray-soft:#eeece5; --purple:#6b46c1; --purple-soft:#efe9fb;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--ink); height:100vh; overflow:hidden;}
+  #app{display:flex; height:100vh;}
+  aside{width:230px; min-width:230px; background:var(--panel); border-right:1px solid var(--line); display:flex; flex-direction:column; padding:16px 12px;}
+  aside h1{font-size:15px; letter-spacing:.4px; text-transform:uppercase; color:var(--muted); margin-bottom:12px; padding:0 6px;}
+  #projectList{flex:1; overflow-y:auto;}
+  .proj{padding:9px 10px; border-radius:8px; cursor:pointer; font-size:14px; display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:2px;}
+  .proj:hover{background:var(--gray-soft);}
+  .proj.active{background:var(--accent-soft); color:var(--accent); font-weight:600;}
+  .proj .count{font-size:11px; color:var(--muted); font-weight:normal;}
+  .side-btn{width:100%; padding:8px; margin-top:8px; border:1px dashed var(--line); background:none; border-radius:8px; cursor:pointer; color:var(--muted); font-size:13px;}
+  .side-btn:hover{border-color:var(--accent); color:var(--accent);}
+  .side-foot{margin-top:12px; border-top:1px solid var(--line); padding-top:10px; display:flex; flex-direction:column; gap:6px;}
+  .side-foot button{padding:7px; font-size:12px; border:1px solid var(--line); background:none; border-radius:7px; cursor:pointer; color:var(--muted);}
+  .side-foot button:hover{color:var(--ink); border-color:var(--muted);}
+  main{flex:1; display:flex; flex-direction:column; overflow:hidden; min-height:0;}
+  .view{flex:1; min-height:0; display:none; flex-direction:column; overflow:hidden;}
+  .view.active{display:flex;}
+  .top{padding:16px 24px 0;}
+  .top-row{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+  .top h2{font-size:22px; cursor:pointer;}
+  .top h2:hover::after{content:" \270E"; font-size:14px; color:var(--muted);}
+  .stats{font-size:13px; color:var(--muted);}
+  .viewtabs{display:flex; gap:4px; margin-top:12px; flex-wrap:wrap;}
+  .viewtab{padding:8px 16px; border-radius:8px; border:1px solid var(--line); background:none; cursor:pointer; font-size:14px; font-weight:600; color:var(--muted);}
+  .viewtab.active{background:var(--accent); color:#fff; border-color:var(--accent);}
+  .typebar{display:flex; gap:6px; margin-top:12px; flex-wrap:wrap; align-items:center;}
+  .pill{padding:7px 14px; border-radius:20px; border:1px solid var(--line); background:var(--panel); cursor:pointer; font-size:13px; color:var(--ink); display:inline-flex; gap:6px; align-items:center;}
+  .pill:hover{border-color:var(--accent);}
+  .pill.active{background:var(--ink); color:#fff; border-color:var(--ink);}
+  .pill .n{font-size:11px; opacity:.65;}
+  .pill-add{padding:7px 12px; border-radius:20px; border:1px dashed var(--line); background:none; cursor:pointer; font-size:13px; color:var(--muted);}
+  .pill-add:hover{border-color:var(--accent); color:var(--accent);}
+  .navbar{display:flex; align-items:center; gap:6px; margin-top:12px; flex-wrap:wrap;}
+  .tiles{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; padding:16px 0 24px;}
+  .tile{position:relative; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.05); transition:transform .12s,border-color .12s;}
+  .tile-dup{position:absolute; top:8px; right:8px; border:none; background:none; cursor:pointer; font-size:15px; opacity:.4;}
+  .tile-dup:hover{opacity:1;}
+  .tile:hover{border-color:var(--accent); transform:translateY(-2px);}
+  .tile-name{font-size:16px; font-weight:600; margin-bottom:6px;}
+  .tile-meta{font-size:12px; color:var(--muted);}
+  .tile-add{display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; color:var(--muted); border-style:dashed; gap:6px;}
+  .tile-add:hover{color:var(--accent);}
+  .tile-plus{font-size:26px; line-height:1;}
+  .toolbar{display:flex; gap:8px; padding:14px 24px; flex-wrap:wrap; align-items:center;}
+  .toolbar input[type=text], .toolbar select{padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:13px; background:var(--panel);}
+  .toolbar input[type=text]{width:200px;}
+  .btn{padding:8px 14px; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; background:var(--gray-soft); color:var(--ink);}
+  .btn:hover{filter:brightness(.96);}
+  .btn.primary{background:var(--accent); color:#fff;}
+  .btn.ghost{background:none; border:1px solid var(--line);}
+  .btn:disabled{opacity:.4; cursor:not-allowed;}
+  .btn.mini{padding:6px 10px; font-size:12px;}
+  .spacer{flex:1;}
+  .table-wrap{flex:1; min-height:0; overflow:auto; padding:0 24px 24px;}
+  table{width:100%; border-collapse:collapse; background:var(--panel); border-radius:10px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.06);}
+  th,td{padding:9px 10px; text-align:left; font-size:13px; border-bottom:1px solid var(--line); vertical-align:top;}
+  th{background:#faf9f5; position:sticky; top:0; font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); cursor:pointer; user-select:none; white-space:nowrap; z-index:1;}
+  th.nosort{cursor:default;}
+  tr:hover td{background:#fcfbf8;}
+  td.long{max-width:280px; white-space:pre-wrap; color:#4a483f; font-size:12px;}
+  td .row-btn{border:none; background:none; cursor:pointer; font-size:14px; padding:2px 4px; opacity:.45;}
+  td .row-btn:hover{opacity:1;}
+  td.ec{cursor:cell;}
+  .cell-edit{width:100%; padding:4px 6px; border:1px solid var(--accent); border-radius:5px; font-size:13px; font-family:inherit; resize:vertical;}
+  .rsz{position:absolute; top:0; right:0; width:8px; height:100%; cursor:col-resize; z-index:2;}
+  .rsz:hover{background:var(--accent); opacity:.35;}
+  #compTable td, #compTable th{overflow:hidden;}
+  #compTable th{white-space:normal;}
+  .badge{display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; background:var(--gray-soft); color:var(--muted);}
+  .b-Idea{background:var(--gray-soft); color:var(--muted);}
+  .b-Borrador{background:var(--yellow-soft); color:var(--yellow);}
+  .b-Enprueba{background:var(--blue-soft); color:var(--blue);}
+  .b-Final{background:var(--green-soft); color:var(--green);}
+  .tag{display:inline-block; background:var(--accent-soft); color:var(--accent); padding:2px 8px; border-radius:5px; font-size:12px; white-space:nowrap; margin:1px 2px 1px 0;}
+  .chip{display:inline-block; background:var(--purple-soft); color:var(--purple); padding:2px 8px; border-radius:12px; font-size:11.5px; margin:1px 2px 1px 0; white-space:nowrap;}
+  .chip.act{background:var(--blue-soft); color:var(--blue);}
+  .chip.pas{background:var(--green-soft); color:var(--green);}
+  .icon-tag{display:inline-block; background:#f0ede4; border:1px solid var(--line); padding:1px 7px; border-radius:6px; font-size:11.5px; margin:1px 2px 1px 0; white-space:nowrap;}
+  .cell-hab{max-width:280px;} .cell-icon{max-width:150px;}
+  .empty{text-align:center; color:var(--muted); padding:60px 20px; font-size:14px;}
+  .usecount{font-size:11px; color:var(--muted);}
+  .yes{color:var(--green); font-weight:700;} .no{color:var(--muted);}
+  .overlay{position:fixed; inset:0; background:rgba(40,35,25,.45); display:none; align-items:center; justify-content:center; z-index:10;}
+  .overlay.open{display:flex;}
+  .modal{background:var(--panel); border-radius:14px; padding:22px; width:640px; max-width:94vw; max-height:90vh; overflow-y:auto; box-shadow:0 12px 40px rgba(0,0,0,.25);}
+  .modal.wide{width:840px;}
+  .modal h3{font-size:17px; margin-bottom:14px;}
+  .modal label, .flabel{display:block; font-size:12px; font-weight:600; color:var(--muted); margin:12px 0 4px;}
+  .modal input[type=text], .modal input[type=number], .modal select, .modal textarea{width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; font-family:inherit;}
+  .modal textarea{resize:vertical;}
+  .modal .hint{font-size:12px; color:var(--muted); margin-top:6px; line-height:1.5;}
+  .modal-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:20px;}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:0 14px;}
+  .tabs{display:flex; gap:4px; margin-bottom:12px;}
+  .tab{padding:7px 14px; border-radius:8px 8px 0 0; border:1px solid var(--line); border-bottom:none; background:var(--gray-soft); cursor:pointer; font-size:13px;}
+  .tab.active{background:var(--panel); font-weight:600; color:var(--accent);}
+  #exportOut{width:100%; height:300px; font-family:Consolas,monospace; font-size:12px; white-space:pre;}
+  .toast{position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 20px; border-radius:8px; font-size:13px; opacity:0; transition:opacity .25s; pointer-events:none; z-index:20;}
+  .toast.show{opacity:1;}
+  .picker{border:1px solid var(--line); border-radius:8px; padding:8px; max-height:320px; overflow-y:auto; background:#fbfaf6;}
+  .pick-item{display:flex; align-items:flex-start; gap:8px; padding:5px 4px; border-radius:6px; cursor:pointer;}
+  .pick-item:hover{background:var(--gray-soft);}
+  .pick-item input{margin-top:3px;}
+  .pick-item .t{font-size:10px; font-weight:700; text-transform:uppercase; padding:1px 5px; border-radius:4px; margin-right:4px;}
+  .t.Activa{background:var(--blue-soft); color:var(--blue);}
+  .t.Pasiva{background:var(--green-soft); color:var(--green);}
+  .t.General{background:var(--gray-soft); color:var(--muted);}
+  .iconrow2{display:grid; grid-template-columns:1fr 90px 56px; gap:8px; align-items:center; margin-bottom:6px;}
+  .iconrow2 .icon-tag{justify-self:start;}
+  .ms-box{display:flex; flex-wrap:wrap; gap:6px;}
+  .ms-opt{display:inline-flex; align-items:center; gap:5px; border:1px solid var(--line); padding:5px 9px; border-radius:16px; cursor:pointer; font-size:13px;}
+  .ms-opt.on{background:var(--accent-soft); color:var(--accent); border-color:var(--accent);}
+  #libBody input, #libBody select, #setBody input, #setBody select, #fieldBody input, #fieldBody select{width:100%; padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-size:13px;}
+  #libBody td, #setBody td, #fieldBody td{vertical-align:middle;}
+  .fld{margin-bottom:2px; padding-bottom:8px;}
+  .fld.special{border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin:10px 0; background:#fbfaf6;}
+  /* ---- Login / sincronización ---- */
+  #loginScreen{position:fixed; inset:0; background:var(--bg); z-index:2000; display:flex; align-items:center; justify-content:center;}
+  .login-card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:32px; width:340px; box-shadow:0 4px 20px rgba(0,0,0,.08);}
+  .login-card h2{font-size:18px; margin-bottom:4px;}
+  .login-card p{font-size:13px; color:var(--muted); margin-bottom:14px;}
+  .login-card label{font-size:12px; color:var(--muted); display:block; margin:10px 0 4px;}
+  .login-card input{width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px;}
+  .login-card button{width:100%; margin-top:18px; padding:10px; border:none; border-radius:8px; background:var(--accent); color:#fff; font-size:14px; font-weight:600; cursor:pointer;}
+  .login-card button:hover{filter:brightness(1.05);}
+  #loginError{color:#a33; font-size:12px; margin-top:10px; display:none;}
+  #syncInfo{font-size:11px; color:var(--muted); text-align:center; margin-top:6px; word-break:break-all;}
+</style>
+</head>
+<body>
+<div id="loginScreen">
+  <div class="login-card">
+    <h2>Hojas Maestras</h2>
+    <p>Ingresa con tu cuenta del equipo</p>
+    <label>Correo</label>
+    <input type="email" id="loginEmail" autocomplete="username">
+    <label>Contraseña</label>
+    <input type="password" id="loginPass" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()">Entrar</button>
+    <div id="loginError"></div>
+  </div>
+</div>
+<div id="app">
+  <aside>
+    <h1>Juegos</h1>
+    <div id="projectList"></div>
+    <button class="side-btn" onclick="addProject()">+ Nuevo juego</button>
+    <div class="side-foot">
+      <button onclick="backupData()">&#11015; Respaldar todo (.json)</button>
+      <button onclick="document.getElementById('importFile').click()">&#11014; Importar respaldo</button>
+      <input type="file" id="importFile" accept=".json" hidden onchange="importData(event)">
+      <button onclick="doLogout()">Cerrar sesión</button>
+      <div id="syncInfo"></div>
+    </div>
+  </aside>
+  <main>
+    <div class="top">
+      <div class="top-row">
+        <h2 id="projTitle" title="Clic para renombrar" onclick="renameProject()"></h2>
+        <span class="stats" id="stats"></span>
+        <span class="spacer"></span>
+        <button class="btn ghost" style="color:#a33" onclick="deleteProject()">Eliminar juego</button>
+      </div>
+      <div id="navBar" class="navbar"></div>
+    </div>
+
+    <div id="viewTypes" class="view">
+      <div class="toolbar"><span class="spacer"></span><button class="btn ghost" onclick="openExport('project')">Exportar juego ▾</button></div>
+      <div class="table-wrap"><div class="tiles" id="typeTiles"></div></div>
+    </div>
+
+    <div id="viewComponentes" class="view">
+      <div class="toolbar">
+        <input type="text" id="search" placeholder="Buscar…" oninput="render()">
+        <span id="dynFilters"></span>
+        <span class="spacer"></span>
+        <button class="btn" id="bulkEditBtn" onclick="openBulkEdit()" disabled>Editar selección</button>
+        <button class="btn" onclick="openBulkAdd()">+ Agregar por lote</button>
+        <button class="btn primary" onclick="openEdit()">+ Agregar nuevo</button>
+        <button class="btn ghost" onclick="openExport()">Exportar ▾</button>
+      </div>
+      <div class="table-wrap" id="compWrap"></div>
+    </div>
+
+    <div id="viewCampos" class="view">
+      <div class="toolbar">
+        <span class="hint" style="color:var(--muted); font-size:13px">Define los campos de cada componente. «Habilidades» y «Ecosistemas» son tipos de campo: agrégalos donde los necesites y configúralos aquí.</span>
+        <span class="spacer"></span>
+        <button class="btn primary" onclick="addField()">+ Nuevo campo</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th class="nosort" style="width:60px">Orden</th>
+            <th class="nosort">Nombre del campo</th>
+            <th class="nosort" style="width:170px">Tipo</th>
+            <th class="nosort">Opciones / configuración</th>
+            <th class="nosort" style="width:90px">En resumen</th>
+            <th class="nosort" style="width:70px">Título</th>
+            <th class="nosort" style="width:50px"></th>
+          </tr></thead>
+          <tbody id="fieldBody"></tbody>
+        </table>
+        <div class="empty" id="fieldEmpty" style="display:none">Aún no hay campos. Crea el primero con «+ Nuevo campo».</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="overlay" id="mEdit">
+  <div class="modal wide">
+    <h3 id="mEditTitle">Agregar componente</h3>
+    <div id="fFields"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeModal('mEdit')">Cancelar</button>
+      <button class="btn primary" onclick="saveEdit()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="mBulkAdd">
+  <div class="modal">
+    <h3>Agregar por lote</h3>
+    <p class="hint" id="bulkHint"></p>
+    <label>Filas</label>
+    <textarea id="bulkText" rows="9"></textarea>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeModal('mBulkAdd')">Cancelar</button>
+      <button class="btn primary" onclick="saveBulkAdd()">Agregar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="mBulkEdit">
+  <div class="modal">
+    <h3 id="mBulkEditTitle">Editar selección</h3>
+    <label>Campo a cambiar</label>
+    <select id="beField" onchange="renderBulkValue()"></select>
+    <div id="beValueWrap"></div>
+    <div id="beHabWrap"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" style="color:#a33; margin-right:auto" onclick="bulkDelete()">Eliminar seleccionados</button>
+      <button class="btn ghost" onclick="closeModal('mBulkEdit')">Cancelar</button>
+      <button class="btn primary" onclick="saveBulkEdit()">Aplicar cambios</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="mExport">
+  <div class="modal wide">
+    <h3>Exportar componentes</h3>
+    <div class="tabs">
+      <div class="tab active" data-fmt="texto" onclick="setExportFmt(this)">Texto</div>
+      <div class="tab" data-fmt="csv" onclick="setExportFmt(this)">CSV</div>
+      <div class="tab" data-fmt="json" onclick="setExportFmt(this)">JSON</div>
+      <div class="tab" data-fmt="md" onclick="setExportFmt(this)">Markdown</div>
+    </div>
+    <textarea id="exportOut" readonly></textarea>
+    <p class="hint" id="exportHint"></p>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeModal('mExport')" style="margin-right:auto">Cerrar</button>
+      <button class="btn" onclick="xlsxExport()">Hoja de cálculo (.xlsx)</button>
+      <button class="btn" onclick="downloadExport()">Descargar archivo</button>
+      <button class="btn primary" onclick="copyExport()">Copiar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="mLib">
+  <div class="modal wide">
+    <h3 id="mLibTitle">Habilidades</h3>
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px"><span class="hint" style="margin:0">Habilidades de este campo. Si varias cartas usan la misma, al editarla cambia en todas.</span><span class="spacer"></span><button class="btn primary mini" onclick="addLibAbility()">+ Nueva habilidad</button></div>
+    <table><thead><tr><th class="nosort" style="width:110px">Tipo</th><th class="nosort" style="width:200px">Nombre</th><th class="nosort">Efecto</th><th class="nosort" style="width:90px">Usos</th><th class="nosort" style="width:50px"></th></tr></thead><tbody id="libBody"></tbody></table>
+    <div class="empty" id="libEmpty" style="display:none">No hay habilidades todavía.</div>
+    <div class="modal-actions"><button class="btn primary" onclick="closeLib()">Cerrar</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="mSet">
+  <div class="modal">
+    <h3 id="mSetTitle">Ecosistemas</h3>
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px"><span class="hint" style="margin:0">Íconos de este campo y cuántas veces puede llevar cada uno una misma carta.</span><span class="spacer"></span><button class="btn primary mini" onclick="addSetIcon()">+ Nuevo ícono</button></div>
+    <table><thead><tr><th class="nosort">Ícono</th><th class="nosort" style="width:140px">Máx. por carta</th><th class="nosort" style="width:90px">Usos</th><th class="nosort" style="width:50px"></th></tr></thead><tbody id="setBody"></tbody></table>
+    <div class="empty" id="setEmpty" style="display:none">Aún no hay íconos.</div>
+    <div class="modal-actions"><button class="btn primary" onclick="closeSet()">Cerrar</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="mColors">
+  <div class="modal">
+    <h3 id="mColorsTitle">Colores</h3>
+    <div id="colorsBody"></div>
+    <p class="hint">Elige un color para cada opción. Se muestra en la etiqueta; con «Colorear fila» tiñe toda la fila.</p>
+    <div class="modal-actions"><button class="btn primary" onclick="closeColors()">Cerrar</button></div>
+  </div>
+</div>
+<div class="overlay" id="mDupType">
+  <div class="modal" style="width:470px">
+    <h3>Duplicar tipo de componente</h3>
+    <p class="hint" id="mDupMsg"></p>
+    <div class="modal-actions" style="gap:8px">
+      <button class="btn ghost" style="margin-right:auto" onclick="closeModal('mDupType')">Cancelar</button>
+      <button class="btn" onclick="doDupType(false)">Solo los campos</button>
+      <button class="btn primary" onclick="doDupType(true)">Campos y contenido</button>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="mPrompt">
+  <div class="modal" style="width:440px">
+    <h3 id="mPromptTitle">Nombre</h3>
+    <label id="mPromptLabel">Nombre</label>
+    <input type="text" id="mPromptInput" onkeydown="if(event.key==='Enter')savePrompt()">
+    <div class="modal-actions"><button class="btn ghost" onclick="closeModal('mPrompt')">Cancelar</button><button class="btn primary" onclick="savePrompt()">Guardar</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script>
+'use strict';
+const KEY='appComponentesJuegos_v1';
+const FIELD_TYPES={text:'Texto corto', long:'Texto largo', number:'Número', select:'Lista desplegable', check:'Sí / No', list:'Lista de valores', multiselect:'Selección múltiple', abilities:'Habilidades', icons:'Ecosistemas / íconos'};
+const ESTADOS=['Idea','Borrador','En prueba','Final'];
+
+/* ---------- Firebase: login y sincronización de equipo ---------- */
+const firebaseConfig={
+  apiKey:"AIzaSyBVcLJaTQ2C4qSEAljpnSCC1_a_7aLsBtQ",
+  authDomain:"hojas-maestras.firebaseapp.com",
+  projectId:"hojas-maestras",
+  storageBucket:"hojas-maestras.firebasestorage.app",
+  messagingSenderId:"731728859875",
+  appId:"1:731728859875:web:4d0b765e586dea46222bd6"
+};
+firebase.initializeApp(firebaseConfig);
+const fbAuth=firebase.auth();
+const fbDoc=firebase.firestore().collection('workspaces').doc('principal');
+const CLIENT_ID=Math.random().toString(36).slice(2);
+let cloudReady=false, saveTimer=null, fbUnsub=null;
+
+function doLogin(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  const err=document.getElementById('loginError');
+  err.style.display='none';
+  if(!email||!pass){ err.textContent='Escribe tu correo y contraseña'; err.style.display='block'; return; }
+  fbAuth.signInWithEmailAndPassword(email,pass).catch(()=>{ err.textContent='Correo o contraseña incorrectos'; err.style.display='block'; });
+}
+function doLogout(){ if(confirm('¿Cerrar sesión?'))fbAuth.signOut(); }
+
+fbAuth.onAuthStateChanged(user=>{
+  const scr=document.getElementById('loginScreen');
+  if(user){
+    scr.style.display='none';
+    document.getElementById('syncInfo').textContent=user.email;
+    startSync();
+  }else{
+    scr.style.display='flex';
+    document.getElementById('syncInfo').textContent='';
+    cloudReady=false;
+    if(fbUnsub){ fbUnsub(); fbUnsub=null; }
+  }
+});
+
+function startSync(){
+  fbDoc.get().then(snap=>{
+    cloudReady=true;
+    if(snap.exists){ applyCloud(snap.data()); }
+    else { pushCloud(); } // primera vez: sube los datos locales
+    if(fbUnsub)fbUnsub();
+    fbUnsub=fbDoc.onSnapshot(s=>{
+      if(!s.exists||s.metadata.hasPendingWrites)return;
+      const d=s.data();
+      if(d.client===CLIENT_ID)return;
+      applyCloud(d);
+      toast('Datos actualizados por '+(d.updatedBy||'el equipo'));
+    });
+  }).catch(()=>{ toast('No se pudo conectar con la nube'); });
+}
+function applyCloud(d){
+  try{
+    const s=JSON.parse(d.data);
+    if(s&&s.projects&&s.projects.length){
+      s.projects.forEach(migrateProject);
+      state=s;
+      if(!state.projects.some(p=>p.id===state.activeId))state.activeId=state.projects[0].id;
+      selected.clear(); resetFilters();
+      localStorage.setItem(KEY, JSON.stringify(state));
+      render();
+    }
+  }catch(e){}
+}
+function pushCloud(){
+  fbDoc.set({
+    data:JSON.stringify(state),
+    client:CLIENT_ID,
+    updatedBy:(fbAuth.currentUser&&fbAuth.currentUser.email)||'',
+    updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(()=>toast('No se pudo guardar en la nube — revisa tu conexión'));
+}
+
+let state=load();
+let editingId=null, editValues={};
+let sortKey=null, sortDir=1, filterState={}, exportFmt='texto', currentView='componentes';
+let libFieldId=null, setFieldId=null;
+const selected=new Set();
+let typeOpened=false, promptCb=null, dupTypeId=null;
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function fid(){ return 'f_'+Math.random().toString(36).slice(2,8); }
+function newType(name){ return {id:uid(), name, fields:[{id:fid(), label:'Nombre', type:'text', primary:true}], components:[], colW:{}}; }
+function newProject(name){ const t=newType('Componente 1'); return {id:uid(), name, types:[t], activeTypeId:t.id}; }
+function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2200); }
+function askText(title,label,value,cb){ document.getElementById('mPromptTitle').textContent=title; document.getElementById('mPromptLabel').textContent=label; const i=document.getElementById('mPromptInput'); i.value=value||''; promptCb=cb; openModal('mPrompt'); setTimeout(()=>{ i.focus(); if(i.select)i.select(); },30); }
+function savePrompt(){ const v=document.getElementById('mPromptInput').value.trim(); if(!v){ toast('Escribe un nombre'); return; } closeModal('mPrompt'); const cb=promptCb; promptCb=null; if(cb)cb(v); }
+
+/* ---------- Habilidades helpers ---------- */
+function parseAbilityString(raw){
+  let tipo='General', rest=String(raw||'').trim();
+  const m=rest.match(/^(Activa|Pasiva|General)\s*[—:-]\s*(.*)$/i);
+  if(m){ tipo=m[1][0].toUpperCase()+m[1].slice(1).toLowerCase(); rest=m[2].trim(); }
+  let nombre=rest, texto=''; const ci=rest.indexOf(': ');
+  if(ci>=0){ nombre=rest.slice(0,ci).trim(); texto=rest.slice(ci+2).trim(); }
+  return {tipo,nombre,texto};
+}
+function abilityLabel(a){ return a.nombre+(a.texto? ': '+a.texto:''); }
+function abilityFull(a){ return (a.tipo&&a.tipo!=='General'? a.tipo+' — ':'')+abilityLabel(a); }
+function findOrCreateAbilityInField(f, tipo, nombre, texto){
+  nombre=(nombre||'').trim(); texto=(texto||'').trim(); if(!nombre&&!texto) return null;
+  if(!Array.isArray(f.library)) f.library=[];
+  let a=f.library.find(x=>x.tipo===tipo&&x.nombre===nombre&&x.texto===texto); if(a) return a.id;
+  a={id:uid(),tipo,nombre,texto}; f.library.push(a); return a.id;
+}
+
+/* ---------- Persistencia + migración ---------- */
+function migrateType(t){
+  if(!Array.isArray(t.fields)){
+    t.fields=[{id:'f_nombre',label:'Nombre',type:'text',primary:true},{id:'f_tipo',label:'Tipo',type:'text'},{id:'f_cantidad',label:'Cantidad',type:'number'},{id:'f_estado',label:'Estado',type:'select',options:ESTADOS.slice()},{id:'f_notas',label:'Notas',type:'long'}];
+    (t.components||[]).forEach(c=>{ if(!c.values){ c.values={}; if(c.nombre!==undefined)c.values.f_nombre=c.nombre; if(c.tipo!==undefined)c.values.f_tipo=c.tipo; if(c.cantidad!==undefined)c.values.f_cantidad=c.cantidad; if(c.estado!==undefined)c.values.f_estado=c.estado; if(c.notas!==undefined)c.values.f_notas=c.notas; } });
+  }
+  if(!Array.isArray(t.components))t.components=[];
+  t.components.forEach(c=>{ if(!c.values)c.values={}; });
+  if(Array.isArray(t.abilities) && t.abilities.length && !t.fields.some(f=>f.type==='abilities')){
+    const idA=fid(); t.fields.push({id:idA,label:'Habilidades',type:'abilities',library:t.abilities});
+    t.components.forEach(c=>{ if(Array.isArray(c.habilidades)&&c.habilidades.length) c.values[idA]=c.habilidades; });
+  }
+  if(Array.isArray(t.iconSet) && t.iconSet.length && !t.fields.some(f=>f.type==='icons')){
+    const idI=fid(); t.fields.push({id:idI,label:'Ecosistemas',type:'icons',iconSet:t.iconSet});
+    t.components.forEach(c=>{ if(Array.isArray(c.iconos)&&c.iconos.length) c.values[idI]=c.iconos; });
+  }
+  delete t.abilities; delete t.iconSet;
+  t.components.forEach(c=>{ delete c.habilidades; delete c.iconos; delete c.nombre; delete c.tipo; delete c.cantidad; delete c.estado; delete c.notas; delete c.texto; });
+  t.fields.forEach(f=>{ if(f.type==='abilities'&&!Array.isArray(f.library))f.library=[]; if(f.type==='icons'&&!Array.isArray(f.iconSet))f.iconSet=[]; });
+  if(!t.fields.some(f=>f.primary)&&t.fields.length) t.fields[0].primary=true;
+  if(!t.colW)t.colW={};
+  if(!t.id)t.id=uid();
+  return t;
+}
+function migrateProject(p){
+  if(!Array.isArray(p.types)){
+    const t={id:uid(), name:'Componente 1', fields:p.fields, components:p.components||[], colW:p.colW, abilities:p.abilities, iconSet:p.iconSet};
+    p.types=[t]; p.activeTypeId=t.id;
+    delete p.fields; delete p.components; delete p.colW; delete p.abilities; delete p.iconSet;
+  }
+  p.types.forEach(migrateType);
+  if(!p.activeTypeId||!p.types.some(t=>t.id===p.activeTypeId)) p.activeTypeId=p.types[0].id;
+  return p;
+}
+function load(){ try{ const raw=localStorage.getItem(KEY); if(raw){ const s=JSON.parse(raw); if(s.projects&&s.projects.length){ s.projects.forEach(migrateProject); return s; } } }catch(e){} const p=newProject('Mi primer juego'); return {projects:[p], activeId:p.id}; }
+function save(){ localStorage.setItem(KEY, JSON.stringify(state)); if(cloudReady){ clearTimeout(saveTimer); saveTimer=setTimeout(pushCloud,600); } }
+function proj(){ return state.projects.find(p=>p.id===state.activeId)||state.projects[0]; }
+function curType(){ const p=proj(); return p.types.find(t=>t.id===p.activeTypeId)||p.types[0]; }
+function fieldById(id){ return curType().fields.find(f=>f.id===id); }
+function primaryField(){ const p=curType(); return p.fields.find(f=>f.primary)||p.fields.find(f=>f.type==='text')||p.fields[0]; }
+function valOf(c,f){ const v=c.values[f.id]; if(v!==undefined)return v; if(f.type==='check')return false; if(f.type==='list'||f.type==='multiselect'||f.type==='abilities'||f.type==='icons')return []; return ''; }
+function titleOf(c){ const pf=primaryField(); const v=pf?c.values[pf.id]:''; return (v===''||v===undefined||v===null)?'(sin título)':v; }
+function splitList(s){ return String(s).split(',').map(x=>x.trim()).filter(Boolean); }
+
+/* ---------- Vistas ---------- */
+function setView(v){ currentView=v; render(); }
+
+/* ---------- Proyectos ---------- */
+function addProject(){ askText('Nuevo juego','Nombre del juego','',n=>{ const p=newProject(n); state.projects.push(p); state.activeId=p.id; typeOpened=false; selected.clear(); resetFilters(); save(); render(); }); }
+function renameProject(){ const p=proj(); askText('Renombrar juego','Nombre',p.name,n=>{ p.name=n; save(); render(); }); }
+function deleteProject(){ const p=proj(); if(!confirm('¿Eliminar "'+p.name+'" con sus '+p.types.reduce((s,t)=>s+t.components.length,0)+' componentes? No se puede deshacer.'))return; state.projects=state.projects.filter(x=>x.id!==p.id); if(!state.projects.length)state.projects.push(newProject('Mi primer juego')); state.activeId=state.projects[0].id; selected.clear(); resetFilters(); save(); render(); }
+function switchProject(id){ state.activeId=id; typeOpened=false; selected.clear(); resetFilters(); const s=document.getElementById('search'); if(s)s.value=''; save(); render(); }
+function resetFilters(){ filterState={}; sortKey=null; }
+
+/* ---------- Filtro / orden ---------- */
+function cellText(c,f){ const v=valOf(c,f);
+  if(f.type==='check')return v?'sí':'no';
+  if(f.type==='abilities')return (v||[]).map(id=>{const a=(f.library||[]).find(x=>x.id===id);return a?abilityLabel(a):'';}).join(' ');
+  if(f.type==='icons')return (v||[]).map(x=>x.tipo).join(' ');
+  if(Array.isArray(v))return v.join(' ');
+  return String(v??''); }
+function visibleComponents(){
+  const q=document.getElementById('search').value.trim().toLowerCase(); const p=curType();
+  let list=p.components.filter(c=>{
+    for(const k in filterState){ const f=fieldById(k); if(f&&filterState[k]&&cellText(c,f)!==filterState[k])return false; }
+    if(q){ if(!p.fields.map(f=>cellText(c,f)).join(' ').toLowerCase().includes(q))return false; }
+    return true;
+  });
+  if(sortKey){ const f=fieldById(sortKey); list=[...list].sort((a,b)=>{ if(f&&f.type==='number')return ((+valOf(a,f)||0)-(+valOf(b,f)||0))*sortDir; return cellText(a,f||{}).localeCompare(cellText(b,f||{}),'es')*sortDir; }); }
+  return list;
+}
+function setSort(k){ if(sortKey===k)sortDir*=-1; else {sortKey=k;sortDir=1;} render(); }
+
+/* ---------- Render ---------- */
+function render(){
+  const p=proj();
+  document.getElementById('projectList').innerHTML=state.projects.map(x=>'<div class="proj '+(x.id===p.id?'active':'')+'" onclick="switchProject(\''+x.id+'\')"><span>'+esc(x.name)+'</span><span class="count">'+x.types.reduce((s,t)=>s+t.components.length,0)+'</span></div>').join('');
+  document.getElementById('projTitle').textContent=p.name;
+  renderNav();
+  if(!typeOpened){ showView('viewTypes'); document.getElementById('stats').textContent=p.types.length+' tipo'+(p.types.length===1?'':'s')+' de componente'; renderTypes(); return; }
+  const t=curType();
+  document.getElementById('stats').textContent=t.components.length+' componentes · '+t.fields.length+' campos';
+  if(currentView==='campos'){ showView('viewCampos'); renderFields(); }
+  else { showView('viewComponentes'); renderComponents(); }
+}
+function showView(id){ ['viewTypes','viewComponentes','viewCampos'].forEach(v=>document.getElementById(v).classList.toggle('active',v===id)); }
+function renderNav(){
+  const nav=document.getElementById('navBar');
+  if(!typeOpened){ nav.innerHTML=''; return; }
+  const t=curType();
+  nav.innerHTML='<button class="btn ghost mini" onclick="backToTypes()">← Tipos</button><span style="font-weight:600;font-size:15px;margin:0 12px 0 6px">'+esc(t.name)+'</span><button class="viewtab '+(currentView==='componentes'?'active':'')+'" onclick="setView(\'componentes\')">Componentes</button><button class="viewtab '+(currentView==='campos'?'active':'')+'" onclick="setView(\'campos\')">Campos</button><span style="flex:1"></span><button class="row-btn" title="Renombrar tipo" onclick="renameType(\''+t.id+'\')">✎</button><button class="row-btn" title="Eliminar tipo" onclick="deleteType()">🗑</button>';
+}
+function renderTypes(){
+  const p=proj();
+  document.getElementById('typeTiles').innerHTML=p.types.map(t=>'<div class="tile" onclick="openType(\''+t.id+'\')"><button class="tile-dup" title="Duplicar tipo" onclick="event.stopPropagation();dupType(\''+t.id+'\')">⧉</button><div class="tile-name">'+esc(t.name)+'</div><div class="tile-meta">'+t.components.length+' componentes · '+t.fields.length+' campos</div></div>').join('')+'<div class="tile tile-add" onclick="addType()"><div class="tile-plus">+</div><div>Nuevo tipo de componente</div></div>';
+}
+function openType(id){ proj().activeTypeId=id; typeOpened=true; currentView='componentes'; selected.clear(); resetFilters(); const s=document.getElementById('search'); if(s)s.value=''; save(); render(); }
+function backToTypes(){ typeOpened=false; selected.clear(); render(); }
+function addType(){ askText('Nuevo tipo de componente','Nombre del tipo (ej: Cartas de Incógnitas, Consejos Mapuche)','',n=>{ const t=newType(n); proj().types.push(t); proj().activeTypeId=t.id; typeOpened=true; currentView='componentes'; selected.clear(); resetFilters(); save(); render(); }); }
+function renameType(id){ const t=proj().types.find(x=>x.id===id); if(!t)return; askText('Renombrar tipo','Nombre',t.name,n=>{ t.name=n; save(); render(); }); }
+function deleteType(){ const p=proj(); if(p.types.length<=1){toast('Debe quedar al menos un tipo de componente');return;} const t=curType(); if(!confirm('¿Eliminar el tipo "'+t.name+'" con sus '+t.components.length+' componentes?'))return; p.types=p.types.filter(x=>x.id!==t.id); p.activeTypeId=p.types[0].id; typeOpened=false; selected.clear(); resetFilters(); save(); render(); }
+function dupType(id){ dupTypeId=id; const t=proj().types.find(x=>x.id===id); if(!t)return; document.getElementById('mDupMsg').textContent='Se creará una copia de "'+t.name+'". ¿Copiar también sus '+t.components.length+' componentes, o solo la estructura de campos?'; openModal('mDupType'); }
+function doDupType(withContent){ const p=proj(); const src=p.types.find(x=>x.id===dupTypeId); if(!src){ closeModal('mDupType'); return; } const copy=JSON.parse(JSON.stringify(src)); copy.id=uid(); copy.name=src.name+' (copia)'; if(withContent){ copy.components.forEach(c=>c.id=uid()); } else { copy.components=[]; } p.types.push(copy); p.activeTypeId=copy.id; typeOpened=true; currentView='campos'; selected.clear(); resetFilters(); save(); closeModal('mDupType'); render(); toast(withContent?'Tipo duplicado con su contenido':'Estructura de campos duplicada'); }
+function renderComponents(){
+  const p=curType();
+  const df=document.getElementById('dynFilters'); df.innerHTML='';
+  p.fields.filter(f=>f.type==='select').forEach(f=>{ const vals=[...new Set(p.components.map(c=>valOf(c,f)).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'es')); const cur=filterState[f.id]||''; df.innerHTML+='<select onchange="setFilter(\''+f.id+'\',this.value)"><option value="">'+esc(f.label)+': todos</option>'+vals.map(v=>'<option '+(v===cur?'selected':'')+'>'+esc(v)+'</option>').join('')+'</select> '; });
+  const list=visibleComponents();
+  let head='<tr><th class="nosort"><input type="checkbox" id="selAll" onchange="toggleAll(this)"><span class="rsz" onmousedown="startResize(event,\'sel\')" onclick="event.stopPropagation()"></span></th>';
+  p.fields.forEach(f=> head+='<th onclick="setSort(\''+f.id+'\')">'+esc(f.label)+(f.primary?' ★':'')+'<span class="rsz" onmousedown="startResize(event,\''+f.id+'\')" onclick="event.stopPropagation()"></span></th>');
+  head+='<th class="nosort">Resumen<span class="rsz" onmousedown="startResize(event,\'resumen\')" onclick="event.stopPropagation()"></span></th><th class="nosort"><span class="rsz" onmousedown="startResize(event,\'acc\')" onclick="event.stopPropagation()"></span></th></tr>';
+  const rcField=p.fields.find(f=>f.rowColor&&(f.type==='select'||f.type==='multiselect'));
+  const rows=list.map(c=>{ let rs=''; if(rcField){ let rv=valOf(c,rcField); if(Array.isArray(rv))rv=rv[0]; const col=(rcField.colors||{})[rv]; if(col)rs=' style="background:'+hexA(col,0.13)+'"'; } let r='<tr'+rs+'><td><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onchange="toggleSel(\''+c.id+'\',this)"></td>';
+    p.fields.forEach(f=> r+=cellHtml(c,f));
+    r+=summaryHtml(c);
+    r+='<td style="white-space:nowrap"><button class="row-btn" title="Editar" onclick="openEdit(\''+c.id+'\')">✎</button><button class="row-btn" title="Duplicar" onclick="duplicate(\''+c.id+'\')">⧉</button><button class="row-btn" title="Eliminar" onclick="removeOne(\''+c.id+'\')">🗑</button></td></tr>';
+    return r; }).join('');
+  const wrap=document.getElementById('compWrap');
+  if(list.length) wrap.innerHTML='<table id="compTable" style="width:'+tableWidth()+'px; table-layout:fixed">'+colgroup()+'<thead>'+head+'</thead><tbody>'+rows+'</tbody></table>';
+  else wrap.innerHTML='<div class="empty">Este tipo de componente aún no tiene elementos.<br>Define su estructura en la pestaña <b>Campos</b>, y luego usa <b>+ Agregar nuevo</b> o <b>+ Agregar por lote</b>.</div>';
+  for(const id of [...selected]) if(!p.components.some(c=>c.id===id)) selected.delete(id);
+  const sa=document.getElementById('selAll'); if(sa) sa.checked=list.length>0&&list.every(c=>selected.has(c.id));
+  const btn=document.getElementById('bulkEditBtn'); btn.disabled=selected.size===0; btn.textContent=selected.size?('Editar selección ('+selected.size+')'):'Editar selección';
+}
+function colDefault(key){ if(key==='sel')return 34; if(key==='acc')return 90; if(key==='resumen')return 320; const f=fieldById(key); if(!f)return 150; return ({number:70,check:60,select:140,long:240,abilities:240,icons:150,multiselect:170,list:150})[f.type]||150; }
+function colWidth(key){ const p=curType(); return (p.colW&&p.colW[key])||colDefault(key); }
+function tableWidth(){ const p=curType(); let s=colWidth('sel'); p.fields.forEach(f=>s+=colWidth(f.id)); return s+colWidth('resumen')+colWidth('acc'); }
+function colgroup(){ const p=curType(); let g='<colgroup><col id="col_sel" style="width:'+colWidth('sel')+'px">'; p.fields.forEach(f=>g+='<col id="col_'+f.id+'" style="width:'+colWidth(f.id)+'px">'); g+='<col id="col_resumen" style="width:'+colWidth('resumen')+'px"><col id="col_acc" style="width:'+colWidth('acc')+'px"></colgroup>'; return g; }
+let rz=null;
+function startResize(e,key){ e.preventDefault(); e.stopPropagation(); rz={key,x:e.clientX,w:colWidth(key)}; document.addEventListener('mousemove',onResize); document.addEventListener('mouseup',endResize); document.body.style.cursor='col-resize'; }
+function onResize(e){ if(!rz)return; const p=curType(); if(!p.colW)p.colW={}; const w=Math.max(40, rz.w+(e.clientX-rz.x)); p.colW[rz.key]=w; const col=document.getElementById('col_'+rz.key); if(col)col.style.width=w+'px'; const t=document.getElementById('compTable'); if(t)t.style.width=tableWidth()+'px'; }
+function endResize(){ document.removeEventListener('mousemove',onResize); document.removeEventListener('mouseup',endResize); document.body.style.cursor=''; if(rz){ rz=null; save(); } }
+function cellHtml(c,f){
+  const v=valOf(c,f);
+  const dcEdit=' ondblclick="editCell(this,\''+c.id+'\',\''+f.id+'\')"';
+  const dcOpen=' ondblclick="openEdit(\''+c.id+'\')"';
+  if(f.type==='abilities'){ const chips=(v||[]).map(id=>{const a=(f.library||[]).find(x=>x.id===id); if(!a)return''; const cls=a.tipo==='Activa'?'act':a.tipo==='Pasiva'?'pas':''; return '<span class="chip '+cls+'" title="'+esc(abilityFull(a))+'">'+esc(a.nombre||a.texto)+'</span>';}).join(''); return '<td class="cell-hab ec"'+dcOpen+'>'+chips+'</td>'; }
+  if(f.type==='icons'){ const t=(v||[]).map(x=>'<span class="icon-tag">'+esc(x.tipo)+' ×'+x.cantidad+'</span>').join(''); return '<td class="cell-icon ec"'+dcOpen+'>'+t+'</td>'; }
+  if(f.type==='check') return '<td class="ec"'+dcEdit+'>'+(v?'<span class="yes">✓</span>':'<span class="no">—</span>')+'</td>';
+  if(f.type==='long') return '<td class="long ec"'+dcEdit+' title="'+esc(v)+'">'+esc(String(v).length>140?String(v).slice(0,140)+'…':v)+'</td>';
+  if(f.type==='multiselect') return '<td class="ec"'+dcEdit+'>'+(Array.isArray(v)?v:[]).map(x=>{const col=(f.colors||{})[x]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; return '<span class="tag"'+st+'>'+esc(x)+'</span>';}).join('')+'</td>';
+  if(f.type==='list') return '<td class="ec"'+dcEdit+'>'+(Array.isArray(v)?v:[]).map(x=>'<span class="tag">'+esc(x)+'</span>').join('')+'</td>';
+  if(f.type==='select'){ const col=(f.colors||{})[v]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; const cls=col?'':'b-'+String(v).replace(/\s/g,''); return '<td class="ec"'+dcEdit+'>'+(v?'<span class="badge '+cls+'"'+st+'>'+esc(v)+'</span>':'')+'</td>'; }
+  if(f.primary) return '<td class="ec"'+dcEdit+'><b>'+esc(v||'(sin título)')+'</b></td>';
+  return '<td class="ec"'+dcEdit+'>'+esc(v)+'</td>';
+}
+function summaryText(c){ const parts=[]; curType().fields.forEach(f=>{ if(f.inSummary===false)return; const val=fieldOut(c,f); if(val!==''&&val!=null) parts.push(f.label+': '+val); }); return parts.join('\n'); }
+function summaryHtml(c){
+  const parts=[];
+  curType().fields.forEach(f=>{ if(f.inSummary===false)return; const val=fieldOut(c,f); if(val!==''&&val!=null) parts.push('<b>'+esc(f.label)+':</b> '+esc(val)); });
+  return '<td class="long ec" style="max-width:360px" ondblclick="openEdit(\''+c.id+'\')"><button class="row-btn" title="Copiar resumen" style="float:right;font-size:15px" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button>'+parts.join('<br>')+'</td>';
+}
+function copySummary(cid){ const c=curType().components.find(x=>x.id===cid); if(!c)return; const t=summaryText(c); navigator.clipboard.writeText(t).then(()=>toast('Resumen copiado')).catch(()=>{ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('Resumen copiado'); }); }
+function editCell(td,cid,fidId){
+  const f=fieldById(fidId); const c=curType().components.find(x=>x.id===cid); if(!f||!c)return;
+  if(f.type==='multiselect'){ openEdit(cid); return; }
+  if(f.type==='check'){ if(c.values[fidId])delete c.values[fidId]; else c.values[fidId]=true; save(); render(); return; }
+  const cur=valOf(c,f); let input;
+  if(f.type==='select'){ input=document.createElement('select'); input.innerHTML='<option value=""></option>'+(f.options||[]).map(o=>'<option '+(o===cur?'selected':'')+'>'+esc(o)+'</option>').join(''); }
+  else if(f.type==='long'){ input=document.createElement('textarea'); input.rows=3; input.value=cur||''; }
+  else { input=document.createElement('input'); input.type=(f.type==='number')?'number':'text'; input.value=Array.isArray(cur)?cur.join(', '):(cur===undefined?'':cur); }
+  input.className='cell-edit'; td.innerHTML=''; td.appendChild(input); input.focus(); if(input.select)input.select();
+  let done=false;
+  const commit=(sav)=>{ if(done)return; done=true; if(sav){ let val=input.value; if(f.type==='number')val=val===''?'':+val; else if(f.type==='list')val=splitList(val); if(val===''||(Array.isArray(val)&&!val.length))delete c.values[fidId]; else c.values[fidId]=val; save(); } render(); };
+  input.addEventListener('blur',()=>commit(true));
+  input.addEventListener('keydown',e=>{ if(e.key==='Enter'&&f.type!=='long'){ e.preventDefault(); commit(true); } else if(e.key==='Escape')commit(false); });
+}
+function setFilter(k,val){ if(val)filterState[k]=val; else delete filterState[k]; render(); }
+function toggleSel(id,cb){ cb.checked?selected.add(id):selected.delete(id); render(); }
+function toggleAll(cb){ visibleComponents().forEach(c=> cb.checked?selected.add(c.id):selected.delete(c.id)); render(); }
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+/* ---------- Colores de opciones ---------- */
+let colorFieldId=null;
+function txtColor(hex){ hex=String(hex||'').replace('#',''); if(hex.length===3)hex=hex.split('').map(c=>c+c).join(''); const r=parseInt(hex.slice(0,2),16)||0,g=parseInt(hex.slice(2,4),16)||0,b=parseInt(hex.slice(4,6),16)||0; return (0.299*r+0.587*g+0.114*b)/255>0.62?'#2b2a26':'#ffffff'; }
+function hexA(hex,a){ hex=String(hex||'').replace('#',''); if(hex.length===3)hex=hex.split('').map(c=>c+c).join(''); const r=parseInt(hex.slice(0,2),16)||0,g=parseInt(hex.slice(2,4),16)||0,b=parseInt(hex.slice(4,6),16)||0; return 'rgba('+r+','+g+','+b+','+a+')'; }
+function toggleRowColor(id,on){ curType().fields.forEach(f=>{ if(f.id!==id) delete f.rowColor; }); const f=fieldById(id); if(on)f.rowColor=true; else delete f.rowColor; save(); renderFields(); }
+function openColors(id){ colorFieldId=id; const f=fieldById(id); if(!f.colors)f.colors={}; document.getElementById('mColorsTitle').textContent='Colores — '+f.label; renderColors(); openModal('mColors'); }
+function renderColors(){
+  const f=fieldById(colorFieldId); const opts=f.options||[]; const box=document.getElementById('colorsBody');
+  if(!opts.length){ box.innerHTML='<p class="hint">Este campo no tiene opciones. Agrégalas primero en la columna de opciones.</p>'; return; }
+  box.innerHTML=opts.map(o=>{ const oe=o.replace(/\\/g,'\\\\').replace(/'/g,"\\'"); const has=!!(f.colors&&f.colors[o]); const cur=has?f.colors[o]:'#cccccc';
+    return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><input type="color" value="'+cur+'" oninput="setColor(\''+oe+'\',this.value)" style="width:46px;height:34px;padding:0;border:1px solid var(--line);border-radius:6px;background:none;cursor:pointer">'
+      +'<span style="flex:1">'+esc(o)+'</span>'
+      +(has?'<span class="badge" style="background:'+f.colors[o]+';color:'+txtColor(f.colors[o])+'">'+esc(o)+'</span> <button class="btn ghost mini" onclick="clearColor(\''+oe+'\')">Quitar</button>':'<span class="usecount">sin color</span>')
+      +'</div>';
+  }).join('');
+}
+function setColor(opt,hex){ const f=fieldById(colorFieldId); if(!f.colors)f.colors={}; f.colors[opt]=hex; save(); renderColors(); }
+function clearColor(opt){ const f=fieldById(colorFieldId); if(f.colors)delete f.colors[opt]; save(); renderColors(); }
+function closeColors(){ closeModal('mColors'); render(); }
+
+/* ---------- Pestaña Campos ---------- */
+function renderFields(){
+  const p=curType();
+  document.getElementById('fieldBody').innerHTML=p.fields.map((f,i)=>{
+    const typeOpts=Object.keys(FIELD_TYPES).map(t=>'<option value="'+t+'" '+(t===f.type?'selected':'')+'>'+FIELD_TYPES[t]+'</option>').join('');
+    let cfg='<span class="usecount">—</span>';
+    if(f.type==='select'||f.type==='multiselect') cfg='<input type="text" value="'+esc((f.options||[]).join(', '))+'" placeholder="Opción1, Opción2…" onchange="updateField(\''+f.id+'\',\'options\',this.value)"><div style="margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn ghost mini" onclick="openColors(\''+f.id+'\')">Colores</button><label style="font-size:12px;color:var(--muted);font-weight:normal;display:inline-flex;gap:5px;align-items:center"><input type="checkbox" '+(f.rowColor?'checked':'')+' onchange="toggleRowColor(\''+f.id+'\',this.checked)"> Colorear fila</label></div>';
+    else if(f.type==='abilities') cfg='<button class="btn ghost mini" onclick="openAbilityLib(\''+f.id+'\')">Configurar habilidades ('+(f.library||[]).length+')</button>';
+    else if(f.type==='icons') cfg='<button class="btn ghost mini" onclick="openIconSet(\''+f.id+'\')">Configurar íconos ('+(f.iconSet||[]).length+')</button>';
+    return '<tr><td style="white-space:nowrap"><button class="row-btn" onclick="moveField('+i+',-1)">▲</button><button class="row-btn" onclick="moveField('+i+',1)">▼</button></td>'+
+      '<td><input type="text" value="'+esc(f.label)+'" onchange="updateField(\''+f.id+'\',\'label\',this.value)"></td>'+
+      '<td><select onchange="updateField(\''+f.id+'\',\'type\',this.value)">'+typeOpts+'</select></td>'+
+      '<td>'+cfg+'</td>'+
+      '<td style="text-align:center"><input type="checkbox" '+(f.inSummary!==false?'checked':'')+' onchange="toggleInSummary(\''+f.id+'\',this.checked)"></td>'+
+      '<td style="text-align:center"><input type="radio" name="primaryField" '+(f.primary?'checked':'')+' onchange="setPrimary(\''+f.id+'\')"></td>'+
+      '<td><button class="row-btn" onclick="deleteField(\''+f.id+'\')">🗑</button></td></tr>';
+  }).join('');
+  document.getElementById('fieldEmpty').style.display=p.fields.length?'none':'';
+}
+function addField(){ curType().fields.push({id:fid(),label:'Nuevo campo',type:'text'}); save(); renderFields(); }
+function updateField(id,field,val){
+  const f=fieldById(id); if(!f)return;
+  if(field==='label'){ f.label=val.trim()||f.label; }
+  else if(field==='type'){ f.type=val; delete f.options; delete f.library; delete f.iconSet; delete f.colors; delete f.rowColor; if(val==='select'||val==='multiselect')f.options=[]; if(val==='abilities')f.library=[]; if(val==='icons')f.iconSet=[]; save(); renderFields(); return; }
+  else if(field==='options'){ f.options=splitList(val); }
+  save(); toast('Campo actualizado');
+}
+function toggleInSummary(id,on){ const f=fieldById(id); if(!f)return; if(on)delete f.inSummary; else f.inSummary=false; save(); }
+function setPrimary(id){ curType().fields.forEach(f=>f.primary=(f.id===id)); save(); toast('Campo título actualizado'); }
+function moveField(i,dir){ const a=curType().fields, j=i+dir; if(j<0||j>=a.length)return; const t=a[i]; a[i]=a[j]; a[j]=t; save(); renderFields(); }
+function deleteField(id){ const p=curType(); const f=fieldById(id); if(p.fields.length<=1){toast('Debe quedar al menos un campo');return;} if(!confirm('¿Eliminar el campo "'+f.label+'"? Se borrará su valor en todas las cartas.'))return; p.fields=p.fields.filter(x=>x.id!==id); if(f.primary&&p.fields.length)p.fields[0].primary=true; p.components.forEach(c=>{delete c.values[id];}); save(); renderFields(); }
+
+/* ---------- Sub-editor: biblioteca de habilidades de un campo ---------- */
+function libField(){ return fieldById(libFieldId); }
+function abUse(abId){ return curType().components.filter(c=>Array.isArray(c.values[libFieldId])&&c.values[libFieldId].includes(abId)).length; }
+function openAbilityLib(id){ libFieldId=id; document.getElementById('mLibTitle').textContent='Habilidades — '+libField().label; renderLib(); openModal('mLib'); }
+function renderLib(){
+  const f=libField(); if(!f)return; const lib=[...(f.library||[])].sort((a,b)=>(a.tipo+a.nombre).localeCompare(b.tipo+b.nombre,'es'));
+  document.getElementById('libBody').innerHTML=lib.map(a=>{ const u=abUse(a.id); return '<tr><td><select onchange="updateAbility(\''+a.id+'\',\'tipo\',this.value)">'+['Activa','Pasiva','General'].map(t=>'<option '+(t===a.tipo?'selected':'')+'>'+t+'</option>').join('')+'</select></td><td><input type="text" value="'+esc(a.nombre)+'" onchange="updateAbility(\''+a.id+'\',\'nombre\',this.value)"></td><td><input type="text" value="'+esc(a.texto)+'" onchange="updateAbility(\''+a.id+'\',\'texto\',this.value)"></td><td><span class="usecount">'+u+' carta'+(u===1?'':'s')+'</span></td><td><button class="row-btn" onclick="deleteAbility(\''+a.id+'\')">🗑</button></td></tr>'; }).join('');
+  document.getElementById('libEmpty').style.display=lib.length?'none':'';
+}
+function addLibAbility(){ libField().library.push({id:uid(),tipo:'Activa',nombre:'Nueva habilidad',texto:''}); save(); renderLib(); }
+function updateAbility(abId,field,val){ const a=libField().library.find(x=>x.id===abId); if(!a)return; a[field]=val; save(); toast('Habilidad actualizada en todas sus cartas'); }
+function deleteAbility(abId){ const f=libField(); const a=f.library.find(x=>x.id===abId); const u=abUse(abId); if(!confirm('¿Eliminar la habilidad "'+a.nombre+'"?'+(u?' Se quitará de '+u+' carta(s).':'')))return; f.library=f.library.filter(x=>x.id!==abId); curType().components.forEach(c=>{ if(Array.isArray(c.values[libFieldId])) c.values[libFieldId]=c.values[libFieldId].filter(h=>h!==abId); }); save(); renderLib(); }
+function closeLib(){ closeModal('mLib'); render(); }
+
+/* ---------- Sub-editor: set de íconos de un campo ---------- */
+function setField(){ return fieldById(setFieldId); }
+function icoUse(nombre){ return curType().components.filter(c=>Array.isArray(c.values[setFieldId])&&c.values[setFieldId].some(x=>x.tipo===nombre&&x.cantidad>0)).length; }
+function openIconSet(id){ setFieldId=id; document.getElementById('mSetTitle').textContent='Íconos — '+setField().label; renderSet(); openModal('mSet'); }
+function renderSet(){
+  const f=setField(); if(!f)return;
+  document.getElementById('setBody').innerHTML=(f.iconSet||[]).map((it,i)=>{ const u=icoUse(it.nombre); let opts=''; for(let n=1;n<=9;n++)opts+='<option value="'+n+'" '+(n===it.max?'selected':'')+'>'+n+'</option>'; return '<tr><td><input type="text" value="'+esc(it.nombre)+'" onchange="updateSetIcon('+i+',\'nombre\',this.value)"></td><td><select onchange="updateSetIcon('+i+',\'max\',this.value)">'+opts+'</select></td><td><span class="usecount">'+u+' carta'+(u===1?'':'s')+'</span></td><td><button class="row-btn" onclick="deleteSetIcon('+i+')">🗑</button></td></tr>'; }).join('');
+  document.getElementById('setEmpty').style.display=(f.iconSet||[]).length?'none':'';
+}
+function addSetIcon(){ setField().iconSet.push({nombre:'Nuevo ícono',max:1}); save(); renderSet(); }
+function updateSetIcon(i,field,val){ const f=setField(); const it=f.iconSet[i]; if(!it)return; if(field==='nombre'){ const oldN=it.nombre,newN=val.trim(); if(!newN)return; if(f.iconSet.some((o,j)=>j!==i&&o.nombre===newN)){toast('Ya existe un ícono con ese nombre');renderSet();return;} it.nombre=newN; curType().components.forEach(c=>{ if(Array.isArray(c.values[setFieldId]))c.values[setFieldId].forEach(x=>{if(x.tipo===oldN)x.tipo=newN;}); }); } else if(field==='max'){ it.max=Math.max(1,parseInt(val)||1); curType().components.forEach(c=>{ if(Array.isArray(c.values[setFieldId]))c.values[setFieldId].forEach(x=>{if(x.tipo===it.nombre&&x.cantidad>it.max)x.cantidad=it.max;}); }); } save(); toast('Ícono actualizado'); }
+function deleteSetIcon(i){ const f=setField(); const it=f.iconSet[i]; if(!it)return; if(!confirm('¿Eliminar el ícono "'+it.nombre+'"? Se quitará de todas las cartas.'))return; f.iconSet.splice(i,1); curType().components.forEach(c=>{ if(Array.isArray(c.values[setFieldId]))c.values[setFieldId]=c.values[setFieldId].filter(x=>x.tipo!==it.nombre); }); save(); renderSet(); }
+function closeSet(){ closeModal('mSet'); render(); }
+
+/* ---------- Editor de componente ---------- */
+function fieldInputHtml(f){
+  const v=editValues[f.id]; const lab='<label class="flabel">'+esc(f.label)+(f.primary?' *':'')+'</label>';
+  if(f.type==='abilities'){
+    const sel=Array.isArray(v)?v:[]; const lib=[...(f.library||[])].sort((a,b)=>(a.tipo+a.nombre).localeCompare(b.tipo+b.nombre,'es'));
+    let h='<div class="fld special">'+lab+'<div class="picker">'+(lib.length?lib.map(a=>'<label class="pick-item"><input type="checkbox" '+(sel.includes(a.id)?'checked':'')+' onchange="toggleAbilityVal(\''+f.id+'\',\''+a.id+'\',this.checked)"><span><span class="t '+a.tipo+'">'+a.tipo+'</span>'+esc(abilityLabel(a))+'</span></label>').join(''):'<div class="hint">Sin habilidades. Créalas abajo o en la pestaña Campos.</div>')+'</div>';
+    h+='<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><select id="qt_'+f.id+'" style="width:auto;padding:6px 8px;border:1px solid var(--line);border-radius:6px"><option>Activa</option><option>Pasiva</option><option>General</option></select><input type="text" id="qn_'+f.id+'" placeholder="Nombre" style="width:140px;padding:6px 8px;border:1px solid var(--line);border-radius:6px"><input type="text" id="qx_'+f.id+'" placeholder="Efecto" style="flex:1;min-width:140px;padding:6px 8px;border:1px solid var(--line);border-radius:6px"><button class="btn mini" type="button" onclick="quickAddAbilityField(\''+f.id+'\')">+ Crear y añadir</button></div></div>';
+    return h;
+  }
+  if(f.type==='icons'){
+    const cur=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
+    const rows=(f.iconSet||[]).length?(f.iconSet).map(it=>{ const c=cur[it.nombre]||0; let opts=''; for(let n=0;n<=it.max;n++)opts+='<option value="'+n+'" '+(n===c?'selected':'')+'>'+n+'</option>'; return '<div class="iconrow2"><span class="icon-tag">'+esc(it.nombre)+'</span><select onchange="setIconVal(\''+f.id+'\',\''+esc(it.nombre).replace(/'/g,"\\'")+'\',this.value)">'+opts+'</select><span class="usecount">máx '+it.max+'</span></div>'; }).join(''):'<div class="hint">Sin íconos. Créalos en la pestaña Campos.</div>';
+    return '<div class="fld special">'+lab+rows+'</div>';
+  }
+  if(f.type==='long') return '<div class="fld">'+lab+'<textarea rows="3" oninput="setVal(\''+f.id+'\',this.value)">'+esc(v||'')+'</textarea></div>';
+  if(f.type==='number') return '<div class="fld">'+lab+'<input type="number" value="'+esc(v??'')+'" oninput="setVal(\''+f.id+'\', this.value===\'\'?\'\':+this.value)"></div>';
+  if(f.type==='check') return '<div class="fld">'+lab+'<label style="font-weight:normal;color:var(--ink);display:inline-flex;gap:8px;align-items:center"><input type="checkbox" style="width:auto" '+(v?'checked':'')+' onchange="setVal(\''+f.id+'\',this.checked)"> Sí</label></div>';
+  if(f.type==='select'){ const opts='<option value="">—</option>'+(f.options||[]).map(o=>'<option '+(o===v?'selected':'')+'>'+esc(o)+'</option>').join(''); return '<div class="fld">'+lab+'<select onchange="setVal(\''+f.id+'\',this.value)">'+opts+'</select></div>'; }
+  if(f.type==='list') return '<div class="fld">'+lab+'<input type="text" value="'+esc((Array.isArray(v)?v:[]).join(', '))+'" placeholder="Separa con comas" oninput="setVal(\''+f.id+'\', splitList(this.value))"></div>';
+  if(f.type==='multiselect'){ const arr=Array.isArray(v)?v:[]; const opts=(f.options||[]).map(o=>'<span class="ms-opt '+(arr.includes(o)?'on':'')+'" onclick="toggleMultiVal(\''+f.id+'\',\''+esc(o).replace(/'/g,"\\'")+'\')">'+esc(o)+'</span>').join(''); return '<div class="fld">'+lab+'<div class="ms-box">'+(opts||'<span class="usecount">Sin opciones. Agrégalas en Campos.</span>')+'</div></div>'; }
+  return '<div class="fld">'+lab+'<input type="text" value="'+esc(v||'')+'" oninput="setVal(\''+f.id+'\',this.value)"></div>';
+}
+function renderFieldInputs(){ document.getElementById('fFields').innerHTML=curType().fields.map(fieldInputHtml).join(''); }
+function setVal(id,val){ editValues[id]=val; }
+function toggleMultiVal(id,opt){ let a=Array.isArray(editValues[id])?editValues[id]:[]; a=a.includes(opt)?a.filter(x=>x!==opt):[...a,opt]; editValues[id]=a; renderFieldInputs(); }
+function toggleAbilityVal(id,abId,on){ let a=Array.isArray(editValues[id])?editValues[id]:[]; if(on){ if(!a.includes(abId))a.push(abId); } else a=a.filter(x=>x!==abId); editValues[id]=a; }
+function setIconVal(id,tipo,val){ if(!editValues[id]||typeof editValues[id]!=='object'||Array.isArray(editValues[id]))editValues[id]={}; editValues[id][tipo]=parseInt(val)||0; }
+function quickAddAbilityField(id){ const f=fieldById(id); if(!f)return; const t=document.getElementById('qt_'+id).value, n=document.getElementById('qn_'+id).value.trim(), x=document.getElementById('qx_'+id).value.trim(); if(!n&&!x){toast('Escribe nombre o efecto');return;} const abId=findOrCreateAbilityInField(f,t,n,x); if(!Array.isArray(editValues[id]))editValues[id]=[]; if(!editValues[id].includes(abId))editValues[id].push(abId); save(); renderFieldInputs(); toast('Habilidad creada y añadida'); }
+function openEdit(id){
+  editingId=(typeof id==='string')?id:null; const c=editingId?curType().components.find(x=>x.id===editingId):null;
+  document.getElementById('mEditTitle').textContent=c?'Editar componente':'Agregar componente';
+  editValues={};
+  curType().fields.forEach(f=>{ const v=c?c.values[f.id]:undefined;
+    if(f.type==='icons'){ const m={}; (Array.isArray(v)?v:[]).forEach(x=>m[x.tipo]=x.cantidad); editValues[f.id]=m; }
+    else if(f.type==='abilities'){ editValues[f.id]=Array.isArray(v)?[...v]:[]; }
+    else if(v!==undefined) editValues[f.id]=v;
+  });
+  renderFieldInputs(); openModal('mEdit');
+}
+function saveEdit(){
+  const p=curType(); const pf=primaryField();
+  if(pf&&(editValues[pf.id]===undefined||String(editValues[pf.id]).trim()==='')){ toast('El campo "'+pf.label+'" es obligatorio'); return; }
+  const values={};
+  p.fields.forEach(f=>{ let v=editValues[f.id];
+    if(f.type==='icons'){ const arr=(f.iconSet||[]).filter(it=>(v&&v[it.nombre]>0)).map(it=>({tipo:it.nombre,cantidad:Math.min(it.max,v[it.nombre])})); if(arr.length)values[f.id]=arr; return; }
+    if(f.type==='abilities'){ const arr=(Array.isArray(v)?v:[]).filter(id=>(f.library||[]).some(a=>a.id===id)); if(arr.length)values[f.id]=arr; return; }
+    if(v===undefined||v===''||v===null)return; if(Array.isArray(v)&&!v.length)return; values[f.id]=v;
+  });
+  if(editingId){ const c=p.components.find(x=>x.id===editingId); c.values=values; toast('Componente actualizado'); }
+  else { p.components.push({id:uid(),values}); toast('Componente agregado'); }
+  save(); closeModal('mEdit'); render();
+}
+function duplicate(id){ const p=curType(); const c=p.components.find(x=>x.id===id); const pf=primaryField(); const nv=JSON.parse(JSON.stringify(c.values||{})); if(pf)nv[pf.id]=(nv[pf.id]||'')+' (copia)'; p.components.splice(p.components.indexOf(c)+1,0,{id:uid(),values:nv}); save(); render(); }
+function removeOne(id){ const c=curType().components.find(x=>x.id===id); if(!confirm('¿Eliminar "'+titleOf(c)+'"?'))return; curType().components=curType().components.filter(x=>x.id!==id); selected.delete(id); save(); render(); }
+
+/* ---------- Lote ---------- */
+function openBulkAdd(){ const simple=curType().fields.filter(f=>f.type!=='abilities'&&f.type!=='icons'); document.getElementById('bulkText').value=''; document.getElementById('bulkHint').innerHTML='Pega filas (columnas separadas por tabulación). Orden: <b>'+simple.map(f=>esc(f.label)).join(' → ')+'</b>. Solo <b>'+esc(primaryField().label)+'</b> es obligatorio. (Habilidades y ecosistemas se agregan luego en cada carta.)'; openModal('mBulkAdd'); }
+function saveBulkAdd(){
+  const p=curType(); const pf=primaryField(); const simple=p.fields.filter(f=>f.type!=='abilities'&&f.type!=='icons');
+  const lines=document.getElementById('bulkText').value.split('\n').map(l=>l.replace(/\r$/,'')).filter(l=>l.trim()); let added=0;
+  for(const line of lines){ const cols=line.includes('\t')?line.split('\t'):line.split(' | '); const values={};
+    simple.forEach((f,i)=>{ let raw=(cols[i]||'').trim(); if(!raw)return; if(f.type==='number')values[f.id]=+raw||0; else if(f.type==='check')values[f.id]=/^(s[ií]|x|1|true|yes)$/i.test(raw); else if(f.type==='list'||f.type==='multiselect')values[f.id]=splitList(raw); else values[f.id]=raw; });
+    if(!values[pf.id])continue; p.components.push({id:uid(),values}); added++;
+  }
+  save(); closeModal('mBulkAdd'); render(); toast(added+' componentes agregados');
+}
+function openBulkEdit(){
+  if(!selected.size)return; const p=curType();
+  const editable=p.fields.filter(f=>f.type!=='abilities'&&f.type!=='icons');
+  document.getElementById('beField').innerHTML='<option value="">— No cambiar campo —</option>'+editable.map(f=>'<option value="'+f.id+'">'+esc(f.label)+'</option>').join('');
+  renderBulkValue();
+  // add/quitar habilidad: opciones de todos los campos de habilidades
+  let habOpts='<option value="">— Ninguna —</option>';
+  p.fields.filter(f=>f.type==='abilities').forEach(f=>{ (f.library||[]).forEach(a=>{ habOpts+='<option value="'+f.id+'|'+a.id+'">'+esc(f.label+' · '+abilityFull(a))+'</option>'; }); });
+  const hasHab=p.fields.some(f=>f.type==='abilities'&&(f.library||[]).length);
+  document.getElementById('beHabWrap').innerHTML = hasHab? '<label>Añadir una habilidad a todos</label><select id="bAddHab">'+habOpts+'</select><label>Quitar una habilidad de todos</label><select id="bDelHab">'+habOpts+'</select>' : '';
+  document.getElementById('mBulkEditTitle').textContent='Editar selección ('+selected.size+' componentes)';
+  openModal('mBulkEdit');
+}
+function renderBulkValue(){
+  const f=fieldById(document.getElementById('beField').value); const box=document.getElementById('beValueWrap');
+  if(!f){ box.innerHTML=''; return; }
+  if(f.type==='number'){ box.innerHTML='<label>Modo</label><select id="beNumMode" onchange="toggleNumMode()"><option value="fijo">Mismo valor para todos</option><option value="seq">Secuencial (en orden de selección)</option></select><div id="beFijoWrap"><label>Nuevo valor</label><input type="number" id="beValue"></div><div id="beSeqWrap" style="display:none"><div class="grid2"><div><label>Inicio</label><input type="number" id="beStart" value="1"></div><div><label>Paso</label><input type="number" id="beStep" value="1"></div></div><p class="hint">Se asigna en el orden en que marcaste las casillas.</p></div>'; return; }
+  let inp;
+  if(f.type==='select') inp='<select id="beValue"><option value="">(vacío)</option>'+(f.options||[]).map(o=>'<option>'+esc(o)+'</option>').join('')+'</select>';
+  else if(f.type==='check') inp='<select id="beValue"><option value="no">No</option><option value="si">Sí</option></select>';
+  else if(f.type==='long') inp='<textarea id="beValue" rows="2"></textarea>';
+  else inp='<input type="text" id="beValue" placeholder="'+(f.type==='list'||f.type==='multiselect'?'separa con comas':'')+'">';
+  box.innerHTML='<label>Nuevo valor para "'+esc(f.label)+'"</label>'+inp;
+}
+function toggleNumMode(){ const seq=document.getElementById('beNumMode').value==='seq'; document.getElementById('beFijoWrap').style.display=seq?'none':''; document.getElementById('beSeqWrap').style.display=seq?'':'none'; }
+function saveBulkEdit(){
+  const p=curType(); const f=fieldById(document.getElementById('beField').value);
+  const byId=id=>p.components.find(c=>c.id===id); const order=[...selected];
+  let seqMode=false,start=0,step=1;
+  if(f&&f.type==='number'){ const mEl=document.getElementById('beNumMode'); if(mEl&&mEl.value==='seq'){ seqMode=true; start=+document.getElementById('beStart').value||0; step=+document.getElementById('beStep').value||1; } }
+  if(f&&seqMode){ order.forEach((id,idx)=>{ const c=byId(id); if(c)c.values[f.id]=start+idx*step; }); }
+  else if(f){ const el=document.getElementById('beValue'); const raw=el?el.value:''; let val; if(f.type==='number')val=raw===''?'':+raw; else if(f.type==='check')val=(raw==='si'); else if(f.type==='list'||f.type==='multiselect')val=splitList(raw); else val=raw; order.forEach(id=>{ const c=byId(id); if(!c)return; if(val===''||(Array.isArray(val)&&!val.length))delete c.values[f.id]; else c.values[f.id]=val; }); }
+  const addEl=document.getElementById('bAddHab'), delEl=document.getElementById('bDelHab');
+  const addHab=addEl?addEl.value:'', delHab=delEl?delEl.value:'';
+  if(addHab||delHab){ order.forEach(id=>{ const c=byId(id); if(!c)return;
+    if(addHab){ const [ff,aa]=addHab.split('|'); if(!Array.isArray(c.values[ff]))c.values[ff]=[]; if(!c.values[ff].includes(aa))c.values[ff].push(aa); }
+    if(delHab){ const [ff,aa]=delHab.split('|'); if(Array.isArray(c.values[ff]))c.values[ff]=c.values[ff].filter(h=>h!==aa); }
+  }); }
+  save(); closeModal('mBulkEdit'); render(); toast(order.length+' componentes actualizados');
+}
+function bulkDelete(){ if(!confirm('¿Eliminar los '+selected.size+' seleccionados?'))return; curType().components=curType().components.filter(c=>!selected.has(c.id)); selected.clear(); save(); closeModal('mBulkEdit'); render(); toast('Componentes eliminados'); }
+
+/* ---------- Exportar ---------- */
+function fieldOut(c,f){ const v=valOf(c,f);
+  if(f.type==='check')return v?'Sí':'No';
+  if(f.type==='abilities')return (v||[]).map(id=>{const a=(f.library||[]).find(x=>x.id===id);return a?abilityFull(a):'';}).filter(Boolean).join(' | ');
+  if(f.type==='icons')return (v||[]).map(x=>x.tipo+' ×'+x.cantidad).join(', ');
+  if(Array.isArray(v))return v.join(', ');
+  return String(v??''); }
+let exportScope='type';
+function openExport(scope){ exportScope=scope||'type'; buildExport(); openModal('mExport'); }
+function setExportFmt(el){ document.querySelectorAll('#mExport .tab').forEach(t=>t.classList.remove('active')); el.classList.add('active'); exportFmt=el.dataset.fmt; buildExport(); }
+function compJson(t,c){ const o={}; t.fields.forEach(f=>{ if(f.type==='abilities')o[f.label]=(valOf(c,f)||[]).map(id=>{const a=(f.library||[]).find(x=>x.id===id);return a?{tipo:a.tipo,nombre:a.nombre,texto:a.texto}:null;}).filter(Boolean); else o[f.label]=valOf(c,f); }); return o; }
+function exportBlock(t, list, fmt){
+  let out='';
+  if(fmt==='texto'){ for(const c of list){ out+='\n• '+titleOf2(t,c)+'\n'; for(const f of t.fields){ if(f.primary)continue; if(f.type==='abilities'){ (valOf(c,f)||[]).forEach(id=>{const a=(f.library||[]).find(x=>x.id===id); if(a)out+='  '+abilityFull(a)+'\n';}); continue; } const val=fieldOut(c,f); if(val)out+='  '+f.label+': '+val.replace(/\n/g,' ')+'\n'; } } }
+  else if(fmt==='md'){ for(const c of list){ out+='### '+titleOf2(t,c)+'\n\n'; for(const f of t.fields){ if(f.primary)continue; if(f.type==='abilities'){ const arr=valOf(c,f)||[]; if(arr.length){ out+='**'+f.label+':**\n'; arr.forEach(id=>{const a=(f.library||[]).find(x=>x.id===id); if(a)out+='- '+abilityFull(a)+'\n';}); out+='\n'; } continue; } const val=fieldOut(c,f); if(val)out+='- **'+f.label+':** '+val.replace(/\n/g,' ')+'\n'; } out+='\n'; } }
+  else if(fmt==='csv'){ const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"'; out=t.fields.map(f=>q(f.label)).join(',')+'\n'+list.map(c=>t.fields.map(f=>q(fieldOut(c,f))).join(',')).join('\n'); }
+  return out;
+}
+function titleOf2(t,c){ const pf=t.fields.find(f=>f.primary)||t.fields.find(f=>f.type==='text')||t.fields[0]; const v=pf?c.values[pf.id]:''; return (v===''||v===undefined||v===null)?'(sin título)':v; }
+function buildExport(){
+  const hint=document.getElementById('exportHint'); let out='';
+  if(exportScope==='project'){
+    const p=proj(); const types=p.types; const total=types.reduce((s,t)=>s+t.components.length,0);
+    if(hint)hint.textContent='Exporta el juego completo: '+types.length+' tipo(s) y '+total+' componentes en total.';
+    if(exportFmt==='json'){ out=JSON.stringify({juego:p.name,exportado:new Date().toISOString().slice(0,10),tipos:types.map(t=>({tipo:t.name,componentes:t.components.map(c=>compJson(t,c))}))},null,2); }
+    else if(exportFmt==='texto'){ out='=== '+p.name.toUpperCase()+' ===\n'; types.forEach(t=>{ out+='\n\n##### '+t.name.toUpperCase()+' ('+t.components.length+') #####\n'+exportBlock(t,t.components,'texto'); }); }
+    else if(exportFmt==='md'){ out='# '+p.name+'\n'; types.forEach(t=>{ out+='\n## '+t.name+'\n\n'+exportBlock(t,t.components,'md'); }); }
+    else { types.forEach((t,i)=>{ out+=(i?'\n\n':'')+'# '+t.name+'\n'+exportBlock(t,t.components,'csv'); }); }
+  } else {
+    const t=curType(); const list=visibleComponents();
+    if(hint)hint.textContent='Exporta “'+t.name+'”: '+list.length+' componentes visibles según los filtros.';
+    if(exportFmt==='json'){ out=JSON.stringify({juego:proj().name,tipo:t.name,exportado:new Date().toISOString().slice(0,10),componentes:list.map(c=>compJson(t,c))},null,2); }
+    else if(exportFmt==='texto'){ out='=== '+proj().name.toUpperCase()+' — '+t.name.toUpperCase()+' ===\n'+list.length+' componentes\n'+exportBlock(t,list,'texto'); }
+    else if(exportFmt==='md'){ out='# '+proj().name+' — '+t.name+'\n\n'+exportBlock(t,list,'md'); }
+    else { out=exportBlock(t,list,'csv'); }
+  }
+  document.getElementById('exportOut').value=out;
+}
+function copyExport(){ const ta=document.getElementById('exportOut'); ta.select(); navigator.clipboard.writeText(ta.value).then(()=>toast('Copiado')).catch(()=>{document.execCommand('copy');toast('Copiado');}); }
+function downloadExport(){ const ext={texto:'txt',csv:'csv',json:'json',md:'md'}[exportFmt]; const mime={texto:'text/plain',csv:'text/csv',json:'application/json',md:'text/markdown'}[exportFmt]; const name=proj().name.replace(/[^\wáéíóúñÁÉÍÓÚÑ -]/g,'').trim().replace(/\s+/g,'_')||'componentes'; const blob=new Blob(['﻿'+document.getElementById('exportOut').value],{type:mime+';charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name+'_componentes.'+ext; a.click(); URL.revokeObjectURL(a.href); }
+
+/* ---------- Exportar a hoja de cálculo (.xlsx) — generador propio, sin dependencias ---------- */
+const _crcT=(()=>{let c,t=[];for(let n=0;n<256;n++){c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
+function crc32(bytes){let c=0xFFFFFFFF;for(let i=0;i<bytes.length;i++)c=_crcT[(c^bytes[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+function colLetter(i){let s='';i++;while(i>0){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26);}return s;}
+function xmlEsc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'');}
+function attrEsc(s){return xmlEsc(s).replace(/"/g,'&quot;');}
+function sheetXML(aoa){
+  let rows='';
+  aoa.forEach((row,r)=>{
+    let cells='';
+    (row||[]).forEach((val,c)=>{
+      if(val===''||val===null||val===undefined)return;
+      const ref=colLetter(c)+(r+1);
+      if(typeof val==='number'&&isFinite(val)) cells+='<c r="'+ref+'"><v>'+val+'</v></c>';
+      else cells+='<c r="'+ref+'" t="inlineStr"><is><t xml:space="preserve">'+xmlEsc(String(val))+'</t></is></c>';
+    });
+    rows+='<row r="'+(r+1)+'">'+cells+'</row>';
+  });
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'+rows+'</sheetData></worksheet>';
+}
+function zipStore(files){
+  const chunks=[]; const central=[]; let offset=0;
+  const enc=new TextEncoder();
+  for(const f of files){
+    const nameBytes=enc.encode(f.name); const data=f.data; const crc=crc32(data);
+    const lh=new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true); lh.setUint16(4,20,true); lh.setUint16(6,0,true); lh.setUint16(8,0,true);
+    lh.setUint16(10,0,true); lh.setUint16(12,0,true);
+    lh.setUint32(14,crc,true); lh.setUint32(18,data.length,true); lh.setUint32(22,data.length,true);
+    lh.setUint16(26,nameBytes.length,true); lh.setUint16(28,0,true);
+    chunks.push(new Uint8Array(lh.buffer)); chunks.push(nameBytes); chunks.push(data);
+    const localOffset=offset; offset+=30+nameBytes.length+data.length;
+    const cd=new DataView(new ArrayBuffer(46));
+    cd.setUint32(0,0x02014b50,true); cd.setUint16(4,20,true); cd.setUint16(6,20,true); cd.setUint16(8,0,true); cd.setUint16(10,0,true);
+    cd.setUint16(12,0,true); cd.setUint16(14,0,true);
+    cd.setUint32(16,crc,true); cd.setUint32(20,data.length,true); cd.setUint32(24,data.length,true);
+    cd.setUint16(28,nameBytes.length,true); cd.setUint16(30,0,true); cd.setUint16(32,0,true);
+    cd.setUint16(34,0,true); cd.setUint16(36,0,true); cd.setUint32(38,0,true); cd.setUint32(42,localOffset,true);
+    central.push({header:new Uint8Array(cd.buffer),name:nameBytes});
+  }
+  const cdStart=offset; let cdSize=0;
+  for(const c of central){ chunks.push(c.header); chunks.push(c.name); cdSize+=46+c.name.length; offset+=46+c.name.length; }
+  const eo=new DataView(new ArrayBuffer(22));
+  eo.setUint32(0,0x06054b50,true); eo.setUint16(4,0,true); eo.setUint16(6,0,true);
+  eo.setUint16(8,central.length,true); eo.setUint16(10,central.length,true);
+  eo.setUint32(12,cdSize,true); eo.setUint32(16,cdStart,true); eo.setUint16(20,0,true);
+  chunks.push(new Uint8Array(eo.buffer));
+  return new Blob(chunks,{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+function buildXlsx(sheets){
+  const enc=new TextEncoder(); const files=[];
+  let ct='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>';
+  sheets.forEach((s,i)=>{ ct+='<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; });
+  ct+='</Types>';
+  files.push({name:'[Content_Types].xml',data:enc.encode(ct)});
+  files.push({name:'_rels/.rels',data:enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>')});
+  let wbSheets='', wbRels='';
+  sheets.forEach((s,i)=>{ const id=i+1; wbSheets+='<sheet name="'+attrEsc(s.name)+'" sheetId="'+id+'" r:id="rId'+id+'"/>'; wbRels+='<Relationship Id="rId'+id+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+id+'.xml"/>'; files.push({name:'xl/worksheets/sheet'+id+'.xml',data:enc.encode(sheetXML(s.aoa))}); });
+  files.push({name:'xl/workbook.xml',data:enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'+wbSheets+'</sheets></workbook>')});
+  files.push({name:'xl/_rels/workbook.xml.rels',data:enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+wbRels+'</Relationships>')});
+  return zipStore(files);
+}
+function sheetName(base, used){
+  let n=String(base).replace(/[\[\]\:\*\?\/\\]/g,' ').replace(/\s+/g,' ').trim().slice(0,31)||'Hoja';
+  let x=n, i=2;
+  while(used.has(x.toLowerCase())){ const suf=' ('+i+')'; x=n.slice(0,31-suf.length)+suf; i++; }
+  used.add(x.toLowerCase()); return x;
+}
+function typeToAOA(t){
+  const header=t.fields.map(f=>f.label);
+  const rows=t.components.map(c=>t.fields.map(f=> f.type==='number' ? (valOf(c,f)===''||valOf(c,f)===undefined?'':Number(valOf(c,f))) : fieldOut(c,f) ));
+  return [header, ...rows];
+}
+function xlsxExport(){
+  try{
+    const sheets=[]; const used=new Set();
+    const types = exportScope==='project' ? proj().types : [curType()];
+    types.forEach(t=>{
+      sheets.push({name:sheetName(t.name,used), aoa:typeToAOA(t)});
+      t.fields.forEach(f=>{
+        if(f.type==='abilities') sheets.push({name:sheetName(t.name+' - '+f.label,used), aoa:[['Tipo','Nombre','Efecto'], ...(f.library||[]).map(a=>[a.tipo,a.nombre,a.texto])]});
+        if(f.type==='icons') sheets.push({name:sheetName(t.name+' - '+f.label,used), aoa:[['Ícono','Máx por carta'], ...(f.iconSet||[]).map(it=>[it.nombre,it.max])]});
+      });
+    });
+    const blob=buildXlsx(sheets);
+    const name=proj().name.replace(/[^\wáéíóúñÁÉÍÓÚÑ -]/g,'').trim().replace(/\s+/g,'_')||'juego';
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name+'.xlsx'; a.click(); URL.revokeObjectURL(a.href);
+    toast('Hoja de cálculo descargada — súbela a Google Drive para abrirla en Sheets');
+  }catch(e){ toast('Error al generar la hoja de cálculo'); }
+}
+
+/* ---------- Respaldo / importar ---------- */
+function backupData(){ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='respaldo_componentes_'+new Date().toISOString().slice(0,10)+'.json'; a.click(); URL.revokeObjectURL(a.href); toast('Respaldo descargado — compártelo con tu equipo'); }
+function importData(ev){ const file=ev.target.files[0]; if(!file)return; const reader=new FileReader();
+  reader.onload=()=>{ try{ const data=JSON.parse(reader.result); if(!data.projects||!Array.isArray(data.projects))throw new Error(); data.projects.forEach(migrateProject);
+    const modo=confirm('Aceptar = REEMPLAZAR todos los datos actuales.\nCancelar = AGREGAR los juegos del archivo junto a los actuales.');
+    if(modo){ state=data; } else { for(const p of data.projects){ p.id=uid(); (p.types||[]).forEach(t=>{ t.id=uid(); t.components.forEach(c=>{c.id=uid();}); }); if(p.types&&p.types.length)p.activeTypeId=p.types[0].id; state.projects.push(p); } }
+    state.activeId=state.projects[0].id; selected.clear(); resetFilters(); save(); render(); toast('Datos importados');
+  }catch(e){ toast('El archivo no es un respaldo válido'); } };
+  reader.readAsText(file); ev.target.value='';
+}
+
+document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o)o.classList.remove('open'); }));
+document.addEventListener('keydown',e=>{ if(e.key==='Escape')document.querySelectorAll('.overlay.open').forEach(o=>o.classList.remove('open')); });
+render();
+</script>
+</body>
+</html>
