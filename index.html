@@ -536,6 +536,7 @@ function visibleComponents(){
     if(q){ if(!(p.fields.map(f=>cellText(c,f)).join(' ')+' '+(c.num??'')+' '+(c.cardNum??'')).toLowerCase().includes(q))return false; }
     return true;
   });
+  if(!sortKey&&p.useCardNum){ list=[...list].sort((a,b)=>{ const av=(a.cardNum!=null)?+a.cardNum:1e9, bv=(b.cardNum!=null)?+b.cardNum:1e9; return av-bv; }); }
   if(sortKey==='_num'||sortKey==='_cardnum'){ const k=(sortKey==='_num')?'num':'cardNum'; list=[...list].sort((a,b)=>((+a[k]||0)-(+b[k]||0))*sortDir); }
   else if(sortKey){ const f=fieldById(sortKey); list=[...list].sort((a,b)=>{ if(f&&f.type==='number')return ((+valOf(a,f)||0)-(+valOf(b,f)||0))*sortDir; return cellText(a,f||{}).localeCompare(cellText(b,f||{}),'es')*sortDir; }); }
   return list;
@@ -584,7 +585,7 @@ function renderComponents(){
   head+='<th class="nosort">Resumen<span class="rsz" onmousedown="startResize(event,\'resumen\')" onclick="event.stopPropagation()"></span></th><th class="nosort"><span class="rsz" onmousedown="startResize(event,\'acc\')" onclick="event.stopPropagation()"></span></th></tr>';
   const rcField=p.fields.find(f=>f.rowColor&&(f.type==='select'||f.type==='multiselect'));
   const rows=list.map(c=>{ let rs=''; if(rcField){ let rv=valOf(c,rcField); if(Array.isArray(rv))rv=rv[0]; const col=(rcField.colors||{})[rv]; if(col)rs=' style="background:'+hexA(col,0.13)+'"'; } let r='<tr'+rs+'><td><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onchange="toggleSel(\''+c.id+'\',this)"></td>';
-    r+='<td class="ec" style="color:var(--muted);font-weight:600" ondblclick="editNum(this,\''+c.id+'\',\'num\')">'+(c.num??'')+'</td>';
+    r+='<td style="color:var(--muted);font-weight:600">'+(c.num??'')+'</td>';
     if(p.useCardNum) r+='<td class="ec" style="color:var(--muted);font-weight:600" ondblclick="editNum(this,\''+c.id+'\',\'cardNum\')">'+(c.cardNum??'')+'</td>';
     p.fields.forEach(f=> r+=cellHtml(c,f));
     r+=summaryHtml(c);
@@ -795,7 +796,7 @@ function fieldInputHtml(f){
 }
 function renderFieldInputs(){
   const t=curType();
-  let top='<div class="grid2"><div class="fld"><label class="flabel">ID</label><input type="number" value="'+(editNumVal??'')+'" oninput="editNumVal=this.value===\'\'?null:+this.value"></div>';
+  let top='<div class="grid2"><div class="fld"><label class="flabel">ID</label><div style="padding:9px 2px;font-weight:600;color:var(--muted)">'+(editNumVal??'—')+'</div></div>';
   top+=(t.useCardNum?'<div class="fld"><label class="flabel">N° de carta</label><input type="number" value="'+(editCardVal===''?'':editCardVal)+'" oninput="editCardVal=this.value===\'\'?\'\':+this.value"></div>':'<div></div>');
   top+='</div>';
   document.getElementById('fFields').innerHTML=top+t.fields.map(fieldInputHtml).join('');
