@@ -654,7 +654,7 @@ function renderFields(){
       '<td>'+cfg+'</td>'+
       '<td style="text-align:center"><input type="checkbox" '+(f.inSummary!==false?'checked':'')+' onchange="toggleInSummary(\''+f.id+'\',this.checked)"></td>'+
       '<td style="text-align:center"><input type="radio" name="primaryField" '+(f.primary?'checked':'')+' onchange="setPrimary(\''+f.id+'\')"></td>'+
-      '<td><button class="row-btn" onclick="deleteField(\''+f.id+'\')">🗑</button></td></tr>';
+      '<td style="white-space:nowrap"><button class="row-btn" title="Duplicar campo" onclick="duplicateField(\''+f.id+'\')">⧉</button><button class="row-btn" onclick="deleteField(\''+f.id+'\')">🗑</button></td></tr>';
   }).join('');
   document.getElementById('fieldEmpty').style.display=p.fields.length?'none':'';
 }
@@ -669,6 +669,15 @@ function updateField(id,field,val){
 function toggleInSummary(id,on){ const f=fieldById(id); if(!f)return; if(on)delete f.inSummary; else f.inSummary=false; save(); }
 function setPrimary(id){ curType().fields.forEach(f=>f.primary=(f.id===id)); save(); toast('Campo título actualizado'); }
 function moveField(i,dir){ const a=curType().fields, j=i+dir; if(j<0||j>=a.length)return; const t=a[i]; a[i]=a[j]; a[j]=t; save(); renderFields(); }
+function duplicateField(id){
+  const p=curType(); const f=fieldById(id); if(!f)return;
+  const copy=JSON.parse(JSON.stringify(f));
+  copy.id=fid(); copy.label=f.label+' (copia)'; delete copy.primary;
+  const i=p.fields.findIndex(x=>x.id===id);
+  p.fields.splice(i+1,0,copy);
+  p.components.forEach(c=>{ if(c.values[id]!==undefined) c.values[copy.id]=JSON.parse(JSON.stringify(c.values[id])); });
+  save(); renderFields(); toast('Campo duplicado');
+}
 function deleteField(id){ const p=curType(); const f=fieldById(id); if(p.fields.length<=1){toast('Debe quedar al menos un campo');return;} if(!confirm('¿Eliminar el campo "'+f.label+'"? Se borrará su valor en todas las cartas.'))return; p.fields=p.fields.filter(x=>x.id!==id); if(f.primary&&p.fields.length)p.fields[0].primary=true; p.components.forEach(c=>{delete c.values[id];}); save(); renderFields(); }
 
 /* ---------- Sub-editor: biblioteca de habilidades de un campo ---------- */
