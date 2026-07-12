@@ -578,7 +578,7 @@ function renderComponents(){
   p.fields.filter(f=>f.type==='select').forEach(f=>{ const vals=[...new Set(p.components.map(c=>valOf(c,f)).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'es')); const cur=filterState[f.id]||''; df.innerHTML+='<select onchange="setFilter(\''+f.id+'\',this.value)"><option value="">'+esc(f.label)+': todos</option>'+vals.map(v=>'<option '+(v===cur?'selected':'')+'>'+esc(v)+'</option>').join('')+'</select> '; });
   const list=visibleComponents();
   let head='<tr><th class="nosort"><input type="checkbox" id="selAll" onchange="toggleAll(this)"><span class="rsz" onmousedown="startResize(event,\'sel\')" onclick="event.stopPropagation()"></span></th>';
-  head+='<th onclick="setSort(\'_num\')">N°<span class="rsz" onmousedown="startResize(event,\'num\')" onclick="event.stopPropagation()"></span></th>';
+  head+='<th onclick="setSort(\'_num\')">ID<span class="rsz" onmousedown="startResize(event,\'num\')" onclick="event.stopPropagation()"></span></th>';
   if(p.useCardNum) head+='<th onclick="setSort(\'_cardnum\')">N° carta<span class="rsz" onmousedown="startResize(event,\'cardnum\')" onclick="event.stopPropagation()"></span></th>';
   p.fields.forEach(f=> head+='<th onclick="setSort(\''+f.id+'\')">'+esc(f.label)+(f.primary?' ★':'')+'<span class="rsz" onmousedown="startResize(event,\''+f.id+'\')" onclick="event.stopPropagation()"></span></th>');
   head+='<th class="nosort">Resumen<span class="rsz" onmousedown="startResize(event,\'resumen\')" onclick="event.stopPropagation()"></span></th><th class="nosort"><span class="rsz" onmousedown="startResize(event,\'acc\')" onclick="event.stopPropagation()"></span></th></tr>';
@@ -618,7 +618,7 @@ function cardHtml(c,p,rcField){
   const tf=p.fields.find(f=>f.primary);
   const title=tf?(valOf(c,tf)||'(sin título)'):'(sin título)';
   let h='<div class="card-c"'+st+' ondblclick="openEdit(\''+c.id+'\')">';
-  h+='<div class="card-head"><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onclick="event.stopPropagation()" ondblclick="event.stopPropagation()" onchange="toggleSel(\''+c.id+'\',this)"><span class="card-title"><span class="card-num">#'+(c.num??'')+'</span> '+esc(title)+(p.useCardNum&&c.cardNum!=null?' <span class="icon-tag" title="N° de carta">Carta '+c.cardNum+'</span>':'')+'</span><span class="card-acts" ondblclick="event.stopPropagation()"><button class="row-btn" title="Copiar resumen" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button><button class="row-btn" title="Editar" onclick="event.stopPropagation();openEdit(\''+c.id+'\')">✎</button><button class="row-btn" title="Duplicar" onclick="event.stopPropagation();duplicate(\''+c.id+'\')">⧉</button><button class="row-btn" title="Eliminar" onclick="event.stopPropagation();removeOne(\''+c.id+'\')">🗑</button></span></div>';
+  h+='<div class="card-head"><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onclick="event.stopPropagation()" ondblclick="event.stopPropagation()" onchange="toggleSel(\''+c.id+'\',this)"><span class="card-title"><span class="card-num">ID '+(c.num??'')+'</span> '+esc(title)+(p.useCardNum&&c.cardNum!=null?' <span class="icon-tag" title="N° de carta">Carta '+c.cardNum+'</span>':'')+'</span><span class="card-acts" ondblclick="event.stopPropagation()"><button class="row-btn" title="Copiar resumen" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button><button class="row-btn" title="Editar" onclick="event.stopPropagation();openEdit(\''+c.id+'\')">✎</button><button class="row-btn" title="Duplicar" onclick="event.stopPropagation();duplicate(\''+c.id+'\')">⧉</button><button class="row-btn" title="Eliminar" onclick="event.stopPropagation();removeOne(\''+c.id+'\')">🗑</button></span></div>';
   p.fields.forEach(f=>{ if(f===tf)return; const vh=cardValHtml(c,f); if(vh===''||vh==null)return; h+='<div class="card-field"><span class="lbl">'+esc(f.label)+'</span>'+vh+'</div>'; });
   return h+'</div>';
 }
@@ -644,10 +644,11 @@ function cellHtml(c,f){
   if(f.primary) return '<td class="ec"'+dcEdit+'><b>'+esc(v||'(sin título)')+'</b></td>';
   return '<td class="ec"'+dcEdit+'>'+esc(v)+'</td>';
 }
-function summaryText(c){ const parts=[]; curType().fields.forEach(f=>{ if(f.inSummary===false)return; const val=fieldOut(c,f); if(val!==''&&val!=null) parts.push(f.label+': '+val); }); return parts.join('\n'); }
+function summaryText(c){ const t=curType(); const parts=[]; if(t.useCardNum&&c.cardNum!=null) parts.push('N° carta: '+c.cardNum); t.fields.forEach(f=>{ if(f.inSummary===false)return; const val=fieldOut(c,f); if(val!==''&&val!=null) parts.push(f.label+': '+val); }); return parts.join('\n'); }
 function summaryHtml(c){
-  const parts=[];
-  curType().fields.forEach(f=>{ if(f.inSummary===false)return; const val=fieldOut(c,f); if(val!==''&&val!=null) parts.push('<b>'+esc(f.label)+':</b> '+esc(val)); });
+  const t=curType(); const parts=[];
+  if(t.useCardNum&&c.cardNum!=null) parts.push('<b>N° carta:</b> '+c.cardNum);
+  t.fields.forEach(f=>{ if(f.inSummary===false)return; const val=fieldOut(c,f); if(val!==''&&val!=null) parts.push('<b>'+esc(f.label)+':</b> '+esc(val)); });
   return '<td class="long ec" style="max-width:360px" ondblclick="openEdit(\''+c.id+'\')"><button class="row-btn" title="Copiar resumen" style="float:right;font-size:15px" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button>'+parts.join('<br>')+'</td>';
 }
 function copySummary(cid){ const c=curType().components.find(x=>x.id===cid); if(!c)return; const t=summaryText(c); navigator.clipboard.writeText(t).then(()=>toast('Resumen copiado')).catch(()=>{ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('Resumen copiado'); }); }
@@ -794,7 +795,7 @@ function fieldInputHtml(f){
 }
 function renderFieldInputs(){
   const t=curType();
-  let top='<div class="grid2"><div class="fld"><label class="flabel">N° ID</label><input type="number" value="'+(editNumVal??'')+'" oninput="editNumVal=this.value===\'\'?null:+this.value"></div>';
+  let top='<div class="grid2"><div class="fld"><label class="flabel">ID</label><input type="number" value="'+(editNumVal??'')+'" oninput="editNumVal=this.value===\'\'?null:+this.value"></div>';
   top+=(t.useCardNum?'<div class="fld"><label class="flabel">N° de carta</label><input type="number" value="'+(editCardVal===''?'':editCardVal)+'" oninput="editCardVal=this.value===\'\'?\'\':+this.value"></div>':'<div></div>');
   top+='</div>';
   document.getElementById('fFields').innerHTML=top+t.fields.map(fieldInputHtml).join('');
