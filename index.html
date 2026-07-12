@@ -92,6 +92,20 @@
   .icon-tag{display:inline-block; background:#f0ede4; border:1px solid var(--line); padding:1px 7px; border-radius:6px; font-size:11.5px; margin:1px 2px 1px 0; white-space:nowrap;}
   .cell-hab{max-width:280px;} .cell-icon{max-width:150px;}
   .empty{text-align:center; color:var(--muted); padding:60px 20px; font-size:14px;}
+  .vswitch{display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden;}
+  .vswitch button{border:none; background:var(--panel); padding:8px 12px; font-size:13px; cursor:pointer; color:var(--muted);}
+  .vswitch button.active{background:var(--accent-soft); color:var(--accent); font-weight:600;}
+  .cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:14px; padding:2px 0 24px;}
+  .card-c{position:relative; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,.05);}
+  .card-c:hover{border-color:var(--accent);}
+  .card-head{display:flex; align-items:flex-start; gap:8px; margin-bottom:8px;}
+  .card-head input{margin-top:3px;}
+  .card-title{font-size:15px; font-weight:600; flex:1; line-height:1.3;}
+  .card-acts{white-space:nowrap;}
+  .card-acts .row-btn{border:none; background:none; cursor:pointer; font-size:14px; padding:2px 4px; opacity:.45;}
+  .card-acts .row-btn:hover{opacity:1;}
+  .card-field{font-size:12.5px; margin-bottom:7px; line-height:1.45; white-space:pre-wrap;}
+  .card-field .lbl{display:block; font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); font-weight:600; margin-bottom:1px;}
   .usecount{font-size:11px; color:var(--muted);}
   .yes{color:var(--green); font-weight:700;} .no{color:var(--muted);}
   .overlay{position:fixed; inset:0; background:rgba(40,35,25,.45); display:none; align-items:center; justify-content:center; z-index:10;}
@@ -188,6 +202,7 @@
         <input type="text" id="search" placeholder="Buscar…" oninput="render()">
         <span id="dynFilters"></span>
         <span class="spacer"></span>
+        <span class="vswitch"><button id="vmLista" title="Ver como lista" onclick="setCompView('lista')">☰ Lista</button><button id="vmTarjetas" title="Ver como tarjetas" onclick="setCompView('tarjetas')">▦ Tarjetas</button></span>
         <button class="btn" id="bulkEditBtn" onclick="openBulkEdit()" disabled>Editar selección</button>
         <button class="btn" onclick="openBulkAdd()">+ Agregar por lote</button>
         <button class="btn primary" onclick="openEdit()">+ Agregar nuevo</button>
@@ -565,11 +580,36 @@ function renderComponents(){
     r+='<td style="white-space:nowrap"><button class="row-btn" title="Editar" onclick="openEdit(\''+c.id+'\')">✎</button><button class="row-btn" title="Duplicar" onclick="duplicate(\''+c.id+'\')">⧉</button><button class="row-btn" title="Eliminar" onclick="removeOne(\''+c.id+'\')">🗑</button></td></tr>';
     return r; }).join('');
   const wrap=document.getElementById('compWrap');
-  if(list.length) wrap.innerHTML='<table id="compTable" style="width:'+tableWidth()+'px; table-layout:fixed">'+colgroup()+'<thead>'+head+'</thead><tbody>'+rows+'</tbody></table>';
-  else wrap.innerHTML='<div class="empty">Este tipo de componente aún no tiene elementos.<br>Define su estructura en la pestaña <b>Campos</b>, y luego usa <b>+ Agregar nuevo</b> o <b>+ Agregar por lote</b>.</div>';
+  const vm=(p.viewMode==='tarjetas')?'tarjetas':'lista';
+  const bL=document.getElementById('vmLista'), bT=document.getElementById('vmTarjetas');
+  if(bL&&bT){ bL.classList.toggle('active',vm==='lista'); bT.classList.toggle('active',vm==='tarjetas'); }
+  if(!list.length) wrap.innerHTML='<div class="empty">Este tipo de componente aún no tiene elementos.<br>Define su estructura en la pestaña <b>Campos</b>, y luego usa <b>+ Agregar nuevo</b> o <b>+ Agregar por lote</b>.</div>';
+  else if(vm==='tarjetas') wrap.innerHTML='<div class="cards">'+list.map(c=>cardHtml(c,p,rcField)).join('')+'</div>';
+  else wrap.innerHTML='<table id="compTable" style="width:'+tableWidth()+'px; table-layout:fixed">'+colgroup()+'<thead>'+head+'</thead><tbody>'+rows+'</tbody></table>';
   for(const id of [...selected]) if(!p.components.some(c=>c.id===id)) selected.delete(id);
   const sa=document.getElementById('selAll'); if(sa) sa.checked=list.length>0&&list.every(c=>selected.has(c.id));
   const btn=document.getElementById('bulkEditBtn'); btn.disabled=selected.size===0; btn.textContent=selected.size?('Editar selección ('+selected.size+')'):'Editar selección';
+}
+function setCompView(m){ curType().viewMode=m; save(); render(); }
+function cardValHtml(c,f){
+  const v=valOf(c,f);
+  if(f.type==='abilities') return (v||[]).map(id=>{const a=(f.library||[]).find(x=>x.id===id); if(!a)return''; const cls=a.tipo==='Activa'?'act':a.tipo==='Pasiva'?'pas':''; return '<span class="chip '+cls+'" title="'+esc(abilityFull(a))+'">'+esc(a.nombre||a.texto)+'</span>';}).join('');
+  if(f.type==='icons') return (v||[]).map(x=>'<span class="icon-tag">'+esc(x.tipo)+' ×'+x.cantidad+'</span>').join('');
+  if(f.type==='check') return v?'<span class="yes">✓</span>':'<span class="no">—</span>';
+  if(f.type==='multiselect') return (Array.isArray(v)?v:[]).map(x=>{const col=(f.colors||{})[x]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; return '<span class="tag"'+st+'>'+esc(x)+'</span>';}).join('');
+  if(f.type==='list') return (Array.isArray(v)?v:[]).map(x=>'<span class="tag">'+esc(x)+'</span>').join('');
+  if(f.type==='select'){ if(!v)return''; const col=(f.colors||{})[v]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; const cls=col?'':'b-'+String(v).replace(/\s/g,''); return '<span class="badge '+cls+'"'+st+'>'+esc(v)+'</span>'; }
+  return esc(v);
+}
+function cardHtml(c,p,rcField){
+  let st='';
+  if(rcField){ let rv=valOf(c,rcField); if(Array.isArray(rv))rv=rv[0]; const col=(rcField.colors||{})[rv]; if(col)st=' style="background:'+hexA(col,0.13)+'"'; }
+  const tf=p.fields.find(f=>f.primary);
+  const title=tf?(valOf(c,tf)||'(sin título)'):'(sin título)';
+  let h='<div class="card-c"'+st+' ondblclick="openEdit(\''+c.id+'\')">';
+  h+='<div class="card-head"><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onclick="event.stopPropagation()" ondblclick="event.stopPropagation()" onchange="toggleSel(\''+c.id+'\',this)"><span class="card-title">'+esc(title)+'</span><span class="card-acts" ondblclick="event.stopPropagation()"><button class="row-btn" title="Copiar resumen" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button><button class="row-btn" title="Editar" onclick="event.stopPropagation();openEdit(\''+c.id+'\')">✎</button><button class="row-btn" title="Duplicar" onclick="event.stopPropagation();duplicate(\''+c.id+'\')">⧉</button><button class="row-btn" title="Eliminar" onclick="event.stopPropagation();removeOne(\''+c.id+'\')">🗑</button></span></div>';
+  p.fields.forEach(f=>{ if(f===tf)return; const vh=cardValHtml(c,f); if(vh===''||vh==null)return; h+='<div class="card-field"><span class="lbl">'+esc(f.label)+'</span>'+vh+'</div>'; });
+  return h+'</div>';
 }
 function colDefault(key){ if(key==='sel')return 34; if(key==='acc')return 90; if(key==='resumen')return 320; const f=fieldById(key); if(!f)return 150; return ({number:70,check:60,select:140,long:240,abilities:240,icons:150,multiselect:170,list:150})[f.type]||150; }
 function colWidth(key){ const p=curType(); return (p.colW&&p.colW[key])||colDefault(key); }
