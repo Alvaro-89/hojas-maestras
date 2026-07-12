@@ -202,6 +202,7 @@
       <div class="toolbar">
         <input type="text" id="search" placeholder="Buscar…" oninput="render()">
         <span id="dynFilters"></span>
+        <span id="sortBox"></span>
         <span class="spacer"></span>
         <span class="vswitch"><button id="vmLista" title="Ver como lista" onclick="setCompView('lista')">☰ Lista</button><button id="vmTarjetas" title="Ver como tarjetas" onclick="setCompView('tarjetas')">▦ Tarjetas</button></span>
         <button class="btn" id="bulkEditBtn" onclick="openBulkEdit()" disabled>Editar selección</button>
@@ -532,7 +533,11 @@ function cellText(c,f){ const v=valOf(c,f);
 function visibleComponents(){
   const q=document.getElementById('search').value.trim().toLowerCase(); const p=curType();
   let list=p.components.filter(c=>{
-    for(const k in filterState){ const f=fieldById(k); if(f&&filterState[k]&&cellText(c,f)!==filterState[k])return false; }
+    for(const k in filterState){ const f=fieldById(k); const fv=filterState[k]; if(!f||!fv)continue; const v=valOf(c,f);
+      if(f.type==='multiselect'||f.type==='list'||f.type==='abilities'){ if(!(Array.isArray(v)&&v.includes(fv)))return false; }
+      else if(f.type==='icons'){ if(!(Array.isArray(v)&&v.some(x=>x.tipo===fv)))return false; }
+      else if(f.type==='check'){ if((fv==='si')!==!!v)return false; }
+      else if(cellText(c,f)!==fv)return false; }
     if(q){ if(!(p.fields.map(f=>cellText(c,f)).join(' ')+' '+(c.num??'')+' '+(c.cardNum??'')).toLowerCase().includes(q))return false; }
     return true;
   });
@@ -542,6 +547,9 @@ function visibleComponents(){
   return list;
 }
 function setSort(k){ if(sortKey===k)sortDir*=-1; else {sortKey=k;sortDir=1;} render(); }
+function setSortSel(v){ sortKey=v||null; sortDir=1; render(); }
+function toggleSortDir(){ if(sortKey){ sortDir*=-1; render(); } }
+function clearFiltros(){ filterState={}; sortKey=null; sortDir=1; const s=document.getElementById('search'); if(s)s.value=''; render(); }
 
 /* ---------- Render ---------- */
 function render(){
@@ -576,7 +584,22 @@ function doDupType(withContent){ const p=proj(); const src=p.types.find(x=>x.id=
 function renderComponents(){
   const p=curType();
   const df=document.getElementById('dynFilters'); df.innerHTML='';
-  p.fields.filter(f=>f.type==='select').forEach(f=>{ const vals=[...new Set(p.components.map(c=>valOf(c,f)).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'es')); const cur=filterState[f.id]||''; df.innerHTML+='<select onchange="setFilter(\''+f.id+'\',this.value)"><option value="">'+esc(f.label)+': todos</option>'+vals.map(v=>'<option '+(v===cur?'selected':'')+'>'+esc(v)+'</option>').join('')+'</select> '; });
+  p.fields.forEach(f=>{
+    let opts=null;
+    if(f.type==='select') opts=[...new Set(p.components.map(c=>valOf(c,f)).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'es')).map(v=>[v,v]);
+    else if(f.type==='multiselect'||f.type==='list'){ const set=new Set(); (f.options||[]).forEach(o=>set.add(o)); p.components.forEach(c=>{ const v=valOf(c,f); (Array.isArray(v)?v:[]).forEach(x=>set.add(x)); }); opts=[...set].sort((a,b)=>String(a).localeCompare(String(b),'es')).map(v=>[v,v]); }
+    else if(f.type==='check') opts=[['si','Sí'],['no','No']];
+    else if(f.type==='abilities') opts=[...(f.library||[])].sort((a,b)=>String(a.nombre||a.texto).localeCompare(String(b.nombre||b.texto),'es')).map(a=>[a.id,a.nombre||a.texto]);
+    else if(f.type==='icons') opts=(f.iconSet||[]).map(it=>[it.nombre,it.nombre]);
+    if(!opts||!opts.length)return;
+    const cur=filterState[f.id]||'';
+    df.innerHTML+='<select onchange="setFilter(\''+f.id+'\',this.value)"><option value="">'+esc(f.label)+': todos</option>'+opts.map(o=>'<option value="'+esc(o[0])+'" '+(String(o[0])===String(cur)?'selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select> ';
+  });
+  const sb=document.getElementById('sortBox');
+  let so='<option value="">Orden: '+(p.useCardNum?'N° de carta':'original')+'</option><option value="_num" '+(sortKey==='_num'?'selected':'')+'>Orden: ID</option>';
+  if(p.useCardNum) so+='<option value="_cardnum" '+(sortKey==='_cardnum'?'selected':'')+'>Orden: N° de carta</option>';
+  p.fields.forEach(f=>{ if(f.type==='abilities'||f.type==='icons')return; so+='<option value="'+f.id+'" '+(sortKey===f.id?'selected':'')+'>Orden: '+esc(f.label)+'</option>'; });
+  sb.innerHTML='<select onchange="setSortSel(this.value)">'+so+'</select>'+(sortKey?' <button class="btn ghost mini" title="Invertir orden" onclick="toggleSortDir()">'+(sortDir===1?'↑':'↓')+'</button>':'')+((Object.keys(filterState).length||sortKey)?' <button class="btn ghost mini" title="Quitar filtros y orden" onclick="clearFiltros()">×</button>':'');
   const list=visibleComponents();
   let head='<tr><th class="nosort"><input type="checkbox" id="selAll" onchange="toggleAll(this)"><span class="rsz" onmousedown="startResize(event,\'sel\')" onclick="event.stopPropagation()"></span></th>';
   head+='<th onclick="setSort(\'_num\')">ID<span class="rsz" onmousedown="startResize(event,\'num\')" onclick="event.stopPropagation()"></span></th>';
