@@ -196,6 +196,8 @@
         <h2 id="projTitle" title="Clic para renombrar" onclick="renameProject()"></h2>
         <span class="stats" id="stats"></span>
         <span class="spacer"></span>
+        <button class="btn ghost" id="undoBtn" onclick="undoChange()" disabled title="Deshacer último cambio (Ctrl+Z)">↩ Deshacer</button>
+        <button class="btn ghost" id="redoBtn" onclick="redoChange()" disabled title="Rehacer (Ctrl+Y)">↪ Rehacer</button>
         <button class="btn ghost" style="color:#a33" onclick="deleteProject()">Eliminar juego</button>
       </div>
       <div id="navBar" class="navbar"></div>
@@ -469,6 +471,7 @@ function applyCloud(d){
       state=s;
       if(!state.projects.some(p=>p.id===state.activeId))state.activeId=state.projects[0].id;
       selected.clear(); resetFilters();
+      histRecord();
       localStorage.setItem(KEY, JSON.stringify(state));
       render();
     }
@@ -484,6 +487,35 @@ function pushCloud(){
 }
 
 let state=load();
+/* ---------- Deshacer / Rehacer ---------- */
+let undoStack=[], redoStack=[], lastSaved=JSON.stringify(state);
+const UNDO_MAX=40;
+function histRecord(){
+  const cur=JSON.stringify(state);
+  if(cur===lastSaved)return;
+  undoStack.push(lastSaved); if(undoStack.length>UNDO_MAX)undoStack.shift();
+  redoStack.length=0; lastSaved=cur; updateUndoBtns();
+}
+function updateUndoBtns(){ const u=document.getElementById('undoBtn'),r=document.getElementById('redoBtn'); if(u)u.disabled=!undoStack.length; if(r)r.disabled=!redoStack.length; }
+function restoreState(str){
+  let s; try{ s=JSON.parse(str); }catch(e){ return; }
+  if(!s||!Array.isArray(s.projects)||!s.projects.length)return;
+  s.projects.forEach(migrateProject); state=s;
+  if(!state.projects.some(x=>x.id===state.activeId))state.activeId=state.projects[0].id;
+  lastSaved=JSON.stringify(state); selected.clear();
+  localStorage.setItem(KEY,lastSaved);
+  if(cloudReady){ clearTimeout(saveTimer); saveTimer=setTimeout(pushCloud,600); }
+  render(); updateUndoBtns();
+}
+function undoChange(){ if(!undoStack.length){ toast('Nada que deshacer'); return; } redoStack.push(JSON.stringify(state)); restoreState(undoStack.pop()); toast('Cambio deshecho'); }
+function redoChange(){ if(!redoStack.length){ toast('Nada que rehacer'); return; } undoStack.push(JSON.stringify(state)); restoreState(redoStack.pop()); toast('Cambio rehecho'); }
+document.addEventListener('keydown',e=>{
+  if(!(e.ctrlKey||e.metaKey))return;
+  const t=e.target; if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT'||t.isContentEditable))return;
+  const k=e.key.toLowerCase();
+  if(k==='z'&&!e.shiftKey){ e.preventDefault(); undoChange(); }
+  else if(k==='y'||(k==='z'&&e.shiftKey)){ e.preventDefault(); redoChange(); }
+});
 let editingId=null, editValues={}, editNumVal=null, editCardVal='';
 let sortKey=null, sortDir=1, filterState={}, exportFmt='texto', currentView='componentes';
 let libFieldId=null, setFieldId=null, libColorDraft={};
@@ -556,7 +588,7 @@ function migrateProject(p){
   return p;
 }
 function load(){ try{ const raw=localStorage.getItem(KEY); if(raw){ const s=JSON.parse(raw); if(s.projects&&s.projects.length){ s.projects.forEach(migrateProject); return s; } } }catch(e){} const p=newProject('Mi primer juego'); return {projects:[p], activeId:p.id}; }
-function save(){ localStorage.setItem(KEY, JSON.stringify(state)); if(cloudReady){ clearTimeout(saveTimer); saveTimer=setTimeout(pushCloud,600); } }
+function save(){ histRecord(); localStorage.setItem(KEY, JSON.stringify(state)); if(cloudReady){ clearTimeout(saveTimer); saveTimer=setTimeout(pushCloud,600); } }
 function proj(){ return state.projects.find(p=>p.id===state.activeId)||state.projects[0]; }
 function curType(){ const p=proj(); return p.types.find(t=>t.id===p.activeTypeId)||p.types[0]; }
 function fieldById(id){ return curType().fields.find(f=>f.id===id); }
