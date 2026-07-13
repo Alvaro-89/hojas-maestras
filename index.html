@@ -166,6 +166,8 @@
   .tok-ac-item{display:flex; align-items:center; gap:8px; padding:6px 10px; cursor:pointer; font-size:13px; white-space:nowrap;}
   .tok-ac-item.sel, .tok-ac-item:hover{background:#f0ede4;}
   .tok-ac-hint{padding:5px 10px; font-size:11px; color:var(--muted); border-top:1px solid var(--line);}
+  .tok-ac-new{color:var(--accent); font-weight:600;}
+  #mTokens{z-index:12;}
 </style>
 </head>
 <body>
@@ -1392,7 +1394,7 @@ document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{
 document.addEventListener('keydown',e=>{ if(e.key==='Escape')document.querySelectorAll('.overlay.open').forEach(o=>o.classList.remove('open')); });
 
 /* ---------- Autocompletado de íconos al escribir [ ---------- */
-let tokAcItems=[], tokAcIdx=0, tokAcTarget=null, tokAcStart=-1;
+let tokAcItems=[], tokAcIdx=0, tokAcTarget=null, tokAcStart=-1, tokAcTyped='', tokAcCanCreate=false;
 function tokAcOpen(){ return document.getElementById('tokAc').style.display!=='none'; }
 function tokAcClose(){ document.getElementById('tokAc').style.display='none'; tokAcTarget=null; tokAcItems=[]; }
 function tokAcCheck(e){
@@ -1407,37 +1409,52 @@ function tokAcCheck(e){
   if(between.includes(']')||between.includes('[')||between.includes('\n')||between.length>40){ if(tokAcOpen())tokAcClose(); return; }
   const q=tokNorm(between);
   const matches=list.filter(x=>tokNorm(x.palabra).includes(q));
-  if(!matches.length){ if(tokAcOpen())tokAcClose(); return; }
-  tokAcTarget=t; tokAcStart=open; tokAcItems=matches; tokAcIdx=0;
+  const typed=between.replace(/[\[\]]/g,'').trim();
+  const canCreate = typed.length>0 && !list.some(x=>tokMatch(typed,x.palabra));
+  if(!matches.length && !canCreate){ if(tokAcOpen())tokAcClose(); return; }
+  tokAcTarget=t; tokAcStart=open; tokAcItems=matches; tokAcTyped=typed; tokAcCanCreate=canCreate; tokAcIdx=0;
   tokAcRender();
 }
 function tokAcRender(){
   const el=document.getElementById('tokAc');
-  el.innerHTML=tokAcItems.map((it,i)=>'<div class="tok-ac-item'+(i===tokAcIdx?' sel':'')+'" onmousedown="event.preventDefault();tokAcPick('+i+')"><span class="tok">'+tokIconHtml(it)+'</span>'+esc(it.palabra)+'</div>').join('')+'<div class="tok-ac-hint">↑↓ elegir · Enter insertar · Esc cerrar</div>';
+  let rows=tokAcItems.map((it,i)=>'<div class="tok-ac-item'+(i===tokAcIdx?' sel':'')+'" onmousedown="event.preventDefault();tokAcPick('+i+')"><span class="tok">'+tokIconHtml(it)+'</span>'+esc(it.palabra)+'</div>').join('');
+  if(tokAcCanCreate) rows+='<div class="tok-ac-item tok-ac-new'+(tokAcIdx===tokAcItems.length?' sel':'')+'" onmousedown="event.preventDefault();tokAcCreate()">＋ Crear ícono «'+esc(tokAcTyped)+'»</div>';
+  el.innerHTML=rows+'<div class="tok-ac-hint">↑↓ elegir · Enter insertar · Esc cerrar</div>';
   el.style.display='block';
   const r=tokAcTarget.getBoundingClientRect();
   el.style.left=Math.max(8, Math.min(r.left, window.innerWidth-el.offsetWidth-8))+'px';
   const top=r.bottom+4;
   el.style.top=(top+el.offsetHeight>window.innerHeight-8 ? Math.max(8, r.top-el.offsetHeight-4) : top)+'px';
 }
-function tokAcPick(i){
-  const it=tokAcItems[i]; const t=tokAcTarget; if(!it||!t){ tokAcClose(); return; }
+function tokAcInsert(palabra){
+  const t=tokAcTarget; if(!t){ tokAcClose(); return; }
   const pos=t.selectionStart; const val=t.value;
   const after=val.slice(pos + (val[pos]===']'?1:0));
-  t.value=val.slice(0,tokAcStart)+'['+it.palabra+']'+after;
-  const np=tokAcStart+it.palabra.length+2;
+  t.value=val.slice(0,tokAcStart)+'['+palabra+']'+after;
+  const np=tokAcStart+palabra.length+2;
   tokAcClose();
   t.focus(); t.setSelectionRange(np,np);
   t.dispatchEvent(new Event('input',{bubbles:true}));
+}
+function tokAcPick(i){ const it=tokAcItems[i]; if(!it){ tokAcClose(); return; } tokAcInsert(it.palabra); }
+function tokAcCreate(){
+  const palabra=tokAcTyped; if(!palabra){ tokAcClose(); return; }
+  const list=tokList();
+  if(!list.some(x=>tokMatch(palabra,x.palabra))) list.push({palabra:palabra, glyph:'estrella', color:'#6b5d4f'});
+  tokAcInsert(palabra);
+  save();
+  openTokens();
+  toast('Ícono «'+palabra+'» creado — elige su dibujo y color');
 }
 document.addEventListener('input',tokAcCheck);
 document.addEventListener('click',e=>{ if(!tokAcOpen())return; if(e.target===tokAcTarget){ tokAcCheck(e); return; } if(!(e.target.closest&&e.target.closest('#tokAc')))tokAcClose(); });
 document.addEventListener('focusin',e=>{ if(tokAcOpen() && e.target!==tokAcTarget)tokAcClose(); });
 document.addEventListener('keydown',e=>{
   if(!tokAcOpen())return;
-  if(e.key==='ArrowDown'){ e.preventDefault(); tokAcIdx=(tokAcIdx+1)%tokAcItems.length; tokAcRender(); }
-  else if(e.key==='ArrowUp'){ e.preventDefault(); tokAcIdx=(tokAcIdx-1+tokAcItems.length)%tokAcItems.length; tokAcRender(); }
-  else if(e.key==='Enter'||e.key==='Tab'){ e.preventDefault(); e.stopPropagation(); tokAcPick(tokAcIdx); }
+  const total=tokAcItems.length+(tokAcCanCreate?1:0);
+  if(e.key==='ArrowDown'){ e.preventDefault(); tokAcIdx=(tokAcIdx+1)%total; tokAcRender(); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); tokAcIdx=(tokAcIdx-1+total)%total; tokAcRender(); }
+  else if(e.key==='Enter'||e.key==='Tab'){ e.preventDefault(); e.stopPropagation(); if(tokAcIdx<tokAcItems.length)tokAcPick(tokAcIdx); else tokAcCreate(); }
   else if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); tokAcClose(); }
 },true);
 render();
