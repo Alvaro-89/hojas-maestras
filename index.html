@@ -989,7 +989,15 @@ const TOK_GLYPHS={
   escudo:{label:'Escudo',svg:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3Z"/>'},
   corazon:{label:'Corazón',svg:'<path d="M12 20C6 15 3 12 3 8.5 3 6 5 4 7.5 4c2 0 3.5 1 4.5 3 1-2 2.5-3 4.5-3C19 4 21 6 21 8.5c0 3.5-3 6.5-9 11.5Z"/>'},
   dado:{label:'Dado',svg:'<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2"/><circle cx="15" cy="9" r="1.2"/><circle cx="9" cy="15" r="1.2"/><circle cx="15" cy="15" r="1.2"/>'},
-  moneda:{label:'Moneda',svg:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/>'}
+  moneda:{label:'Moneda',svg:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/>'},
+  acuifero:{label:'Sistema acuífero',svg:'<path d="M3 8c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/><path d="M3 13c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/><path d="M3 18c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/>'},
+  montana:{label:'Montaña',svg:'<path d="M3 20L10 6l4 8 3-5 4 11H3Z"/>'},
+  bosque:{label:'Bosque húmedo',svg:'<path d="M8 3l5 9H3l5-9Z"/><path d="M8 12v5"/><path d="M17 8l4 7h-8l4-7Z"/><path d="M17 15v4"/><path d="M3 21c3-1.5 6-1.5 9 0"/>'},
+  pampa:{label:'Pampa',svg:'<path d="M4 20c0-4-1-6-2-8"/><path d="M8 20c0-5 1-8 3-11"/><path d="M12 20c0-4-1-7-2-9"/><path d="M16 20c0-5 1-8 3-10"/><path d="M20 20c0-3-1-5-2-7"/>'},
+  fichaAcuifero:{label:'Ficha: acuífero',svg:'<circle cx="12" cy="12" r="9.5"/><path d="M7 10c1.6-1.6 3.4-1.6 5 0s3.4 1.6 5 0"/><path d="M7 14c1.6-1.6 3.4-1.6 5 0s3.4 1.6 5 0"/>'},
+  fichaMontana:{label:'Ficha: montaña',svg:'<circle cx="12" cy="12" r="9.5"/><path d="M6.5 16l3.5-7 2 4 1.5-2.5 3.5 5.5H6.5Z"/>'},
+  fichaBosque:{label:'Ficha: bosque',svg:'<circle cx="12" cy="12" r="9.5"/><path d="M12 6l4 7H8l4-7Z"/><path d="M12 13v4"/>'},
+  fichaPampa:{label:'Ficha: pampa',svg:'<circle cx="12" cy="12" r="9.5"/><path d="M9 16c0-3-.5-4.5-1.5-6"/><path d="M12 16c0-3.5.5-5.5 1.5-7"/><path d="M15 16c0-2.5-.5-4-1-5"/>'}
 };
 function tokList(){ const p=proj(); if(!Array.isArray(p.textIcons))p.textIcons=[]; return p.textIcons; }
 function tokNorm(x){ return String(x).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\u200B\u200C\u200D\uFEFF]/g,'').toLowerCase().trim(); }
