@@ -675,6 +675,30 @@ let rz=null;
 function startResize(e,key){ e.preventDefault(); e.stopPropagation(); rz={key,x:e.clientX,w:colWidth(key)}; document.addEventListener('mousemove',onResize); document.addEventListener('mouseup',endResize); document.body.style.cursor='col-resize'; }
 function onResize(e){ if(!rz)return; const p=curType(); if(!p.colW)p.colW={}; const w=Math.max(40, rz.w+(e.clientX-rz.x)); p.colW[rz.key]=w; const col=document.getElementById('col_'+rz.key); if(col)col.style.width=w+'px'; const t=document.getElementById('compTable'); if(t)t.style.width=tableWidth()+'px'; }
 function endResize(){ document.removeEventListener('mousemove',onResize); document.removeEventListener('mouseup',endResize); document.body.style.cursor=''; if(rz){ rz=null; save(); } }
+function autoFit(key){
+  const table=document.getElementById('compTable'); if(!table)return;
+  const p=curType(); const order=['sel','num']; if(p.useCardNum)order.push('cardnum'); p.fields.forEach(f=>order.push(f.id)); order.push('resumen','acc');
+  const idx=order.indexOf(key); if(idx<0)return;
+  const meas=document.createElement('div');
+  meas.style.cssText='position:absolute;visibility:hidden;white-space:nowrap;font-size:13px;left:-9999px;top:0';
+  document.body.appendChild(meas);
+  let w=40;
+  table.querySelectorAll('tr').forEach(tr=>{
+    const cell=tr.children[idx]; if(!cell)return;
+    meas.innerHTML=cell.innerHTML;
+    meas.querySelectorAll('.rsz').forEach(x=>x.remove());
+    w=Math.max(w,meas.scrollWidth+24);
+  });
+  meas.remove();
+  w=Math.min(w,520);
+  if(!p.colW)p.colW={}; p.colW[key]=w; save(); render();
+}
+document.addEventListener('dblclick',e=>{
+  const h=(e.target&&e.target.closest)?e.target.closest('.rsz'):null; if(!h)return;
+  e.preventDefault(); e.stopPropagation();
+  const m=String(h.getAttribute('onmousedown')||'').match(/startResize\(event,'([^']+)'\)/);
+  if(m)autoFit(m[1]);
+});
 function cellHtml(c,f){
   const v=valOf(c,f);
   const dcEdit=' ondblclick="editCell(this,\''+c.id+'\',\''+f.id+'\')"';
