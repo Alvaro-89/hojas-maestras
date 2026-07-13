@@ -122,6 +122,8 @@
   .modal label, .flabel{display:block; font-size:12px; font-weight:600; color:var(--muted); margin:12px 0 4px;}
   .modal input[type=text], .modal input[type=number], .modal select, .modal textarea{width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; font-family:inherit;}
   .modal textarea{resize:vertical;}
+  .modal textarea.abtxt{resize:none; overflow:hidden; min-height:37px; line-height:1.4;}
+  #mLib tbody td{vertical-align:top;}
   .modal .hint{font-size:12px; color:var(--muted); margin-top:6px; line-height:1.5;}
   .modal-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:20px;}
   .grid2{display:grid; grid-template-columns:1fr 1fr; gap:0 14px;}
@@ -957,7 +959,7 @@ function deleteField(id){ const p=curType(); const f=fieldById(id); if(p.fields.
 /* ---------- Sub-editor: biblioteca de habilidades de un campo ---------- */
 function libField(){ return fieldById(libFieldId); }
 function abUse(abId){ return curType().components.filter(c=>Array.isArray(c.values[libFieldId])&&c.values[libFieldId].includes(abId)).length; }
-function openAbilityLib(id){ libFieldId=id; libColorDraft=JSON.parse(JSON.stringify(libField().tipoColors||{})); document.getElementById('mLibTitle').textContent='Habilidades — '+libField().label; const s=document.getElementById('libSearch'); if(s)s.value=''; renderLib(); openModal('mLib'); }
+function openAbilityLib(id){ libFieldId=id; libColorDraft=JSON.parse(JSON.stringify(libField().tipoColors||{})); document.getElementById('mLibTitle').textContent='Habilidades — '+libField().label; const s=document.getElementById('libSearch'); if(s)s.value=''; openModal('mLib'); renderLib(); }
 const ABIL_DEF={Activa:{bg:'#e8f0fa',fg:'#2b6cb0'},Pasiva:{bg:'#e6f2ea',fg:'#2f7d4f'},General:{bg:'#eeece5',fg:'#8a8578'}};
 function chipStyle(f,tipo){ const c=f&&f.tipoColors&&f.tipoColors[tipo]; return c?' style="background:'+c.bg+';color:'+c.fg+'"':''; }
 function abilDraftColor(tipo){ return libColorDraft[tipo]||ABIL_DEF[tipo]||ABIL_DEF.General; }
@@ -994,12 +996,14 @@ function renderLibColors(){
   h+='<div id="libColorBar" style="margin-top:10px; display:flex; align-items:center; gap:8px"></div>';
   box.innerHTML=h; updateLibColorBar();
 }
+function abGrow(el){ el.style.height='auto'; el.style.height=(el.scrollHeight+2)+'px'; }
 function renderLib(){
   const f=libField(); if(!f)return; let lib=[...(f.library||[])].sort((a,b)=>(a.tipo+a.nombre).localeCompare(b.tipo+b.nombre,'es'));
   const total=lib.length;
   const q=tokNorm((document.getElementById('libSearch')||{}).value||'');
   if(q) lib=lib.filter(a=>tokNorm((a.nombre||'')+' '+(a.texto||'')+' '+(a.tipo||'')).includes(q));
-  document.getElementById('libBody').innerHTML=lib.map(a=>{ const u=abUse(a.id); return '<tr><td><select onchange="updateAbility(\''+a.id+'\',\'tipo\',this.value)">'+['Activa','Pasiva','General'].map(t=>'<option '+(t===a.tipo?'selected':'')+'>'+t+'</option>').join('')+'</select></td><td><input type="text" value="'+esc(a.nombre)+'" onchange="updateAbility(\''+a.id+'\',\'nombre\',this.value)"></td><td><input type="text" value="'+esc(a.texto)+'" onchange="updateAbility(\''+a.id+'\',\'texto\',this.value)"></td><td>'+(u>0?'<a class="usecount" style="cursor:pointer;text-decoration:underline" onclick="showAbilCards(\''+a.id+'\')">'+u+' carta'+(u===1?'':'s')+'</a>':'<span class="usecount">0 cartas</span>')+'</td><td><button class="row-btn" onclick="deleteAbility(\''+a.id+'\')">🗑</button></td></tr>'; }).join('');
+  document.getElementById('libBody').innerHTML=lib.map(a=>{ const u=abUse(a.id); return '<tr><td><select onchange="updateAbility(\''+a.id+'\',\'tipo\',this.value)">'+['Activa','Pasiva','General'].map(t=>'<option '+(t===a.tipo?'selected':'')+'>'+t+'</option>').join('')+'</select></td><td><input type="text" value="'+esc(a.nombre)+'" onchange="updateAbility(\''+a.id+'\',\'nombre\',this.value)"></td><td><textarea class="abtxt" rows="1" oninput="abGrow(this)" onchange="updateAbility(\''+a.id+'\',\'texto\',this.value)">'+esc(a.texto)+'</textarea></td><td>'+(u>0?'<a class="usecount" style="cursor:pointer;text-decoration:underline" onclick="showAbilCards(\''+a.id+'\')">'+u+' carta'+(u===1?'':'s')+'</a>':'<span class="usecount">0 cartas</span>')+'</td><td><button class="row-btn" onclick="deleteAbility(\''+a.id+'\')">🗑</button></td></tr>'; }).join('');
+  document.querySelectorAll('#libBody .abtxt').forEach(abGrow);
   const empty=document.getElementById('libEmpty');
   empty.textContent=(!lib.length&&q)?'Ninguna habilidad coincide con la búsqueda.':'No hay habilidades todavía.';
   empty.style.display=lib.length?'none':'';
