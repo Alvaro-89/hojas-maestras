@@ -375,7 +375,7 @@
     <h3 id="mColorsTitle">Colores</h3>
     <div id="colorsBody"></div>
     <p class="hint">Elige un color para cada opción. Se muestra en la etiqueta; con «Colorear fila» tiñe toda la fila.</p>
-    <div class="modal-actions"><button class="btn primary" onclick="closeColors()">Cerrar</button></div>
+    <div class="modal-actions"><button class="btn ghost" onclick="closeColors()">Cancelar</button><button class="btn primary" onclick="applyColors()">Aplicar</button></div>
   </div>
 </div>
 <div class="overlay" id="mDupType">
@@ -817,24 +817,27 @@ function toggleAll(cb){ visibleComponents().forEach(c=> cb.checked?selected.add(
 function openModal(id){ document.getElementById(id).classList.add('open'); }
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
 /* ---------- Colores de opciones ---------- */
-let colorFieldId=null;
+let colorFieldId=null, colorDraft={};
 function txtColor(hex){ hex=String(hex||'').replace('#',''); if(hex.length===3)hex=hex.split('').map(c=>c+c).join(''); const r=parseInt(hex.slice(0,2),16)||0,g=parseInt(hex.slice(2,4),16)||0,b=parseInt(hex.slice(4,6),16)||0; return (0.299*r+0.587*g+0.114*b)/255>0.62?'#2b2a26':'#ffffff'; }
 function hexA(hex,a){ hex=String(hex||'').replace('#',''); if(hex.length===3)hex=hex.split('').map(c=>c+c).join(''); const r=parseInt(hex.slice(0,2),16)||0,g=parseInt(hex.slice(2,4),16)||0,b=parseInt(hex.slice(4,6),16)||0; return 'rgba('+r+','+g+','+b+','+a+')'; }
 function toggleRowColor(id,on){ curType().fields.forEach(f=>{ if(f.id!==id) delete f.rowColor; }); const f=fieldById(id); if(on)f.rowColor=true; else delete f.rowColor; save(); renderFields(); }
-function openColors(id){ colorFieldId=id; const f=fieldById(id); if(!f.colors)f.colors={}; document.getElementById('mColorsTitle').textContent='Colores — '+f.label; renderColors(); openModal('mColors'); }
+function openColors(id){ colorFieldId=id; const f=fieldById(id); if(!f.colors)f.colors={}; colorDraft=Object.assign({},f.colors); document.getElementById('mColorsTitle').textContent='Colores — '+f.label; renderColors(); openModal('mColors'); }
 function renderColors(){
   const f=fieldById(colorFieldId); const opts=f.options||[]; const box=document.getElementById('colorsBody');
   if(!opts.length){ box.innerHTML='<p class="hint">Este campo no tiene opciones. Agrégalas primero en la columna de opciones.</p>'; return; }
-  box.innerHTML=opts.map(o=>{ const oe=o.replace(/\\/g,'\\\\').replace(/'/g,"\\'"); const has=!!(f.colors&&f.colors[o]); const cur=has?f.colors[o]:'#cccccc';
-    return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><input type="color" value="'+cur+'" oninput="setColor(\''+oe+'\',this.value)" style="width:46px;height:34px;padding:0;border:1px solid var(--line);border-radius:6px;background:none;cursor:pointer">'
+  box.innerHTML=opts.map((o,i)=>{ const has=colorDraft[o]!==undefined; const cur=has?colorDraft[o]:'#cccccc';
+    return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><input type="color" value="'+cur+'" oninput="setColorDraft('+i+',this.value)" onchange="renderColors()" style="width:46px;height:34px;padding:0;border:1px solid var(--line);border-radius:6px;background:none;cursor:pointer">'
       +'<span style="flex:1">'+esc(o)+'</span>'
-      +(has?'<span class="badge" style="background:'+f.colors[o]+';color:'+txtColor(f.colors[o])+'">'+esc(o)+'</span> <button class="btn ghost mini" onclick="clearColor(\''+oe+'\')">Quitar</button>':'<span class="usecount">sin color</span>')
+      +'<span id="colorprev_'+i+'">'+(has?'<span class="badge" style="background:'+colorDraft[o]+';color:'+txtColor(colorDraft[o])+'">'+esc(o)+'</span>':'<span class="usecount">sin color</span>')+'</span>'
+      +(has?' <button class="btn ghost mini" onclick="clearColorDraft('+i+')">Quitar</button>':'')
       +'</div>';
   }).join('');
 }
-function setColor(opt,hex){ const f=fieldById(colorFieldId); if(!f.colors)f.colors={}; f.colors[opt]=hex; save(); renderColors(); }
-function clearColor(opt){ const f=fieldById(colorFieldId); if(f.colors)delete f.colors[opt]; save(); renderColors(); }
-function closeColors(){ closeModal('mColors'); render(); }
+function setColorDraft(i,hex){ const f=fieldById(colorFieldId); const o=(f.options||[])[i]; if(o===undefined)return; colorDraft[o]=hex; const pv=document.getElementById('colorprev_'+i); if(pv)pv.innerHTML='<span class="badge" style="background:'+hex+';color:'+txtColor(hex)+'">'+esc(o)+'</span>'; }
+function clearColorDraft(i){ const f=fieldById(colorFieldId); const o=(f.options||[])[i]; if(o===undefined)return; delete colorDraft[o]; renderColors(); }
+function colorsDirty(){ const f=fieldById(colorFieldId); return JSON.stringify(colorDraft)!==JSON.stringify(f.colors||{}); }
+function applyColors(){ const f=fieldById(colorFieldId); f.colors=Object.assign({},colorDraft); save(); closeModal('mColors'); render(); toast('Colores aplicados'); }
+function closeColors(){ if(colorsDirty()&&!confirm('Hay cambios de color sin aplicar. ¿Cerrar sin aplicarlos?'))return; closeModal('mColors'); }
 
 /* ---------- Pestaña Campos ---------- */
 function renderFields(){
