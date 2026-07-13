@@ -162,6 +162,10 @@
   .login-card button:hover{filter:brightness(1.05);}
   #loginError{color:#a33; font-size:12px; margin-top:10px; display:none;}
   #syncInfo{font-size:11px; color:var(--muted); text-align:center; margin-top:6px; word-break:break-all;}
+  #tokAc{position:fixed; z-index:60; background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 8px 26px rgba(0,0,0,.14); max-height:250px; overflow:auto; min-width:210px; max-width:300px;}
+  .tok-ac-item{display:flex; align-items:center; gap:8px; padding:6px 10px; cursor:pointer; font-size:13px; white-space:nowrap;}
+  .tok-ac-item.sel, .tok-ac-item:hover{background:#f0ede4;}
+  .tok-ac-hint{padding:5px 10px; font-size:11px; color:var(--muted); border-top:1px solid var(--line);}
 </style>
 </head>
 <body>
@@ -1386,7 +1390,58 @@ function importData(ev){ const file=ev.target.files[0]; if(!file)return; const r
 
 document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o)o.classList.remove('open'); }));
 document.addEventListener('keydown',e=>{ if(e.key==='Escape')document.querySelectorAll('.overlay.open').forEach(o=>o.classList.remove('open')); });
+
+/* ---------- Autocompletado de íconos al escribir [ ---------- */
+let tokAcItems=[], tokAcIdx=0, tokAcTarget=null, tokAcStart=-1;
+function tokAcOpen(){ return document.getElementById('tokAc').style.display!=='none'; }
+function tokAcClose(){ document.getElementById('tokAc').style.display='none'; tokAcTarget=null; tokAcItems=[]; }
+function tokAcCheck(e){
+  const t=e.target;
+  if(!t || !((t.tagName==='INPUT'&&t.type==='text') || t.tagName==='TEXTAREA')){ if(tokAcOpen())tokAcClose(); return; }
+  if(t.id==='search' || (t.closest&&t.closest('#mTokens'))){ if(tokAcOpen())tokAcClose(); return; }
+  const list=tokList(); if(!list.length){ if(tokAcOpen())tokAcClose(); return; }
+  const pos=t.selectionStart; const val=t.value;
+  const open=val.lastIndexOf('[', pos-1);
+  if(open<0){ if(tokAcOpen())tokAcClose(); return; }
+  const between=val.slice(open+1, pos);
+  if(between.includes(']')||between.includes('[')||between.includes('\n')||between.length>40){ if(tokAcOpen())tokAcClose(); return; }
+  const q=tokNorm(between);
+  const matches=list.filter(x=>tokNorm(x.palabra).includes(q));
+  if(!matches.length){ if(tokAcOpen())tokAcClose(); return; }
+  tokAcTarget=t; tokAcStart=open; tokAcItems=matches; tokAcIdx=0;
+  tokAcRender();
+}
+function tokAcRender(){
+  const el=document.getElementById('tokAc');
+  el.innerHTML=tokAcItems.map((it,i)=>'<div class="tok-ac-item'+(i===tokAcIdx?' sel':'')+'" onmousedown="event.preventDefault();tokAcPick('+i+')"><span class="tok">'+tokIconHtml(it)+'</span>'+esc(it.palabra)+'</div>').join('')+'<div class="tok-ac-hint">↑↓ elegir · Enter insertar · Esc cerrar</div>';
+  el.style.display='block';
+  const r=tokAcTarget.getBoundingClientRect();
+  el.style.left=Math.max(8, Math.min(r.left, window.innerWidth-el.offsetWidth-8))+'px';
+  const top=r.bottom+4;
+  el.style.top=(top+el.offsetHeight>window.innerHeight-8 ? Math.max(8, r.top-el.offsetHeight-4) : top)+'px';
+}
+function tokAcPick(i){
+  const it=tokAcItems[i]; const t=tokAcTarget; if(!it||!t){ tokAcClose(); return; }
+  const pos=t.selectionStart; const val=t.value;
+  const after=val.slice(pos + (val[pos]===']'?1:0));
+  t.value=val.slice(0,tokAcStart)+'['+it.palabra+']'+after;
+  const np=tokAcStart+it.palabra.length+2;
+  tokAcClose();
+  t.focus(); t.setSelectionRange(np,np);
+  t.dispatchEvent(new Event('input',{bubbles:true}));
+}
+document.addEventListener('input',tokAcCheck);
+document.addEventListener('click',e=>{ if(!tokAcOpen())return; if(e.target===tokAcTarget){ tokAcCheck(e); return; } if(!(e.target.closest&&e.target.closest('#tokAc')))tokAcClose(); });
+document.addEventListener('focusin',e=>{ if(tokAcOpen() && e.target!==tokAcTarget)tokAcClose(); });
+document.addEventListener('keydown',e=>{
+  if(!tokAcOpen())return;
+  if(e.key==='ArrowDown'){ e.preventDefault(); tokAcIdx=(tokAcIdx+1)%tokAcItems.length; tokAcRender(); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); tokAcIdx=(tokAcIdx-1+tokAcItems.length)%tokAcItems.length; tokAcRender(); }
+  else if(e.key==='Enter'||e.key==='Tab'){ e.preventDefault(); e.stopPropagation(); tokAcPick(tokAcIdx); }
+  else if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); tokAcClose(); }
+},true);
 render();
 </script>
+<div id="tokAc" style="display:none"></div>
 </body>
 </html>
