@@ -655,7 +655,7 @@ function cardValHtml(c,f){
   if(f.type==='multiselect') return (Array.isArray(v)?v:[]).map(x=>{const col=(f.colors||{})[x]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; return '<span class="tag"'+st+'>'+esc(x)+'</span>';}).join('');
   if(f.type==='list') return (Array.isArray(v)?v:[]).map(x=>'<span class="tag">'+esc(x)+'</span>').join('');
   if(f.type==='select'){ if(!v)return''; const col=(f.colors||{})[v]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; const cls=col?'':'b-'+String(v).replace(/\s/g,''); return '<span class="badge '+cls+'"'+st+'>'+esc(v)+'</span>'; }
-  return esc(v);
+  return f.italic?'<i>'+esc(v)+'</i>':esc(v);
 }
 function cardHtml(c,p,rcField){
   let st='';
@@ -706,18 +706,18 @@ function cellHtml(c,f){
   if(f.type==='abilities'){ const chips=(v||[]).map(id=>{const a=(f.library||[]).find(x=>x.id===id); if(!a)return''; const cls=a.tipo==='Activa'?'act':a.tipo==='Pasiva'?'pas':''; return '<span class="chip '+cls+'" title="'+esc(abilityFull(a))+'">'+esc(a.nombre||a.texto)+'</span>';}).join(''); return '<td class="cell-hab ec"'+dcOpen+'>'+chips+'</td>'; }
   if(f.type==='icons'){ const t=(v||[]).map(x=>'<span class="icon-tag">'+esc(x.tipo)+' ×'+x.cantidad+'</span>').join(''); return '<td class="cell-icon ec"'+dcOpen+'>'+t+'</td>'; }
   if(f.type==='check') return '<td class="ec"'+dcEdit+'>'+(v?'<span class="yes">✓</span>':'<span class="no">—</span>')+'</td>';
-  if(f.type==='long') return '<td class="long ec"'+dcEdit+' title="'+esc(v)+'">'+esc(String(v).length>140?String(v).slice(0,140)+'…':v)+'</td>';
+  if(f.type==='long'){ const shown=esc(String(v).length>140?String(v).slice(0,140)+'…':v); return '<td class="long ec"'+dcEdit+' title="'+esc(v)+'">'+(f.italic?'<i>'+shown+'</i>':shown)+'</td>'; }
   if(f.type==='multiselect') return '<td class="ec"'+dcEdit+'>'+(Array.isArray(v)?v:[]).map(x=>{const col=(f.colors||{})[x]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; return '<span class="tag"'+st+'>'+esc(x)+'</span>';}).join('')+'</td>';
   if(f.type==='list') return '<td class="ec"'+dcEdit+'>'+(Array.isArray(v)?v:[]).map(x=>'<span class="tag">'+esc(x)+'</span>').join('')+'</td>';
   if(f.type==='select'){ const col=(f.colors||{})[v]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; const cls=col?'':'b-'+String(v).replace(/\s/g,''); return '<td class="ec"'+dcEdit+'>'+(v?'<span class="badge '+cls+'"'+st+'>'+esc(v)+'</span>':'')+'</td>'; }
-  if(f.primary) return '<td class="ec"'+dcEdit+'><b>'+esc(v||'(sin título)')+'</b></td>';
-  return '<td class="ec"'+dcEdit+'>'+esc(v)+'</td>';
+  if(f.primary) return '<td class="ec"'+dcEdit+'><b>'+(f.italic?'<i>'+esc(v||'(sin título)')+'</i>':esc(v||'(sin título)'))+'</b></td>';
+  return '<td class="ec"'+dcEdit+'>'+(f.italic?'<i>'+esc(v)+'</i>':esc(v))+'</td>';
 }
 function summaryText(c){ const t=curType(); const parts=[]; if(t.useCardNum&&c.cardNum!=null) parts.push('N° carta: '+c.cardNum); t.fields.forEach(f=>{ if(f.inSummary===false)return; const val=fieldOut(c,f); if(val!==''&&val!=null) parts.push(f.label+': '+val); }); return parts.join('\n'); }
 function summaryHtml(c){
   const t=curType(); const parts=[];
   if(t.useCardNum&&c.cardNum!=null) parts.push('<b>N° carta:</b> '+c.cardNum);
-  t.fields.forEach(f=>{ if(f.inSummary===false)return; const val=fieldOut(c,f); if(val!==''&&val!=null) parts.push('<b>'+esc(f.label)+':</b> '+esc(val)); });
+  t.fields.forEach(f=>{ if(f.inSummary===false)return; const val=fieldOut(c,f); if(val!==''&&val!=null) parts.push('<b>'+esc(f.label)+':</b> '+(f.italic?'<i>'+esc(val)+'</i>':esc(val))); });
   return '<td class="long ec" style="max-width:360px" ondblclick="openEdit(\''+c.id+'\')"><button class="row-btn" title="Copiar resumen" style="float:right;font-size:15px" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button>'+parts.join('<br>')+'</td>';
 }
 function copySummary(cid){ const c=curType().components.find(x=>x.id===cid); if(!c)return; const t=summaryText(c); navigator.clipboard.writeText(t).then(()=>toast('Resumen copiado')).catch(()=>{ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('Resumen copiado'); }); }
@@ -802,6 +802,7 @@ function renderFields(){
     const typeOpts=Object.keys(FIELD_TYPES).map(t=>'<option value="'+t+'" '+(t===f.type?'selected':'')+'>'+FIELD_TYPES[t]+'</option>').join('');
     let cfg='<span class="usecount">—</span>';
     if(f.type==='select'||f.type==='multiselect') cfg='<input type="text" value="'+esc((f.options||[]).join(', '))+'" placeholder="Opción1, Opción2…" onchange="updateField(\''+f.id+'\',\'options\',this.value)"><div style="margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn ghost mini" onclick="openColors(\''+f.id+'\')">Colores</button><label style="font-size:12px;color:var(--muted);font-weight:normal;display:inline-flex;gap:5px;align-items:center"><input type="checkbox" '+(f.rowColor?'checked':'')+' onchange="toggleRowColor(\''+f.id+'\',this.checked)"> Colorear fila</label></div>';
+    else if(f.type==='text'||f.type==='long') cfg='<label style="font-size:12px;color:var(--muted);font-weight:normal;display:inline-flex;gap:5px;align-items:center"><input type="checkbox" '+(f.italic?'checked':'')+' onchange="toggleItalic(\''+f.id+'\',this.checked)"> <i>Cursiva</i></label>';
     else if(f.type==='abilities') cfg='<button class="btn ghost mini" onclick="openAbilityLib(\''+f.id+'\')">Configurar habilidades ('+(f.library||[]).length+')</button>';
     else if(f.type==='icons') cfg='<button class="btn ghost mini" onclick="openIconSet(\''+f.id+'\')">Configurar íconos ('+(f.iconSet||[]).length+')</button>';
     return '<tr><td style="white-space:nowrap"><button class="row-btn" onclick="moveField('+i+',-1)">▲</button><button class="row-btn" onclick="moveField('+i+',1)">▼</button></td>'+
@@ -827,6 +828,7 @@ function updateField(id,field,val){
 }
 function toggleInSummary(id,on){ const f=fieldById(id); if(!f)return; if(on)delete f.inSummary; else f.inSummary=false; save(); }
 function toggleInCard(id,on){ const f=fieldById(id); if(!f)return; if(on)delete f.inCard; else f.inCard=false; save(); }
+function toggleItalic(id,on){ const f=fieldById(id); if(!f)return; if(on)f.italic=true; else delete f.italic; save(); render(); }
 function setPrimary(id){ curType().fields.forEach(f=>f.primary=(f.id===id)); save(); toast('Campo título actualizado'); }
 function moveField(i,dir){ const a=curType().fields, j=i+dir; if(j<0||j>=a.length)return; const t=a[i]; a[i]=a[j]; a[j]=t; save(); renderFields(); }
 function duplicateField(id){
@@ -882,13 +884,13 @@ function fieldInputHtml(f){
     const rows=(f.iconSet||[]).length?(f.iconSet).map(it=>{ const c=cur[it.nombre]||0; let opts=''; for(let n=0;n<=it.max;n++)opts+='<option value="'+n+'" '+(n===c?'selected':'')+'>'+n+'</option>'; return '<div class="iconrow2"><span class="icon-tag">'+esc(it.nombre)+'</span><select onchange="setIconVal(\''+f.id+'\',\''+esc(it.nombre).replace(/'/g,"\\'")+'\',this.value)">'+opts+'</select><span class="usecount">máx '+it.max+'</span></div>'; }).join(''):'<div class="hint">Sin íconos. Créalos en la pestaña Campos.</div>';
     return '<div class="fld special">'+lab+rows+'</div>';
   }
-  if(f.type==='long') return '<div class="fld">'+lab+'<textarea rows="3" oninput="setVal(\''+f.id+'\',this.value)">'+esc(v||'')+'</textarea></div>';
+  if(f.type==='long') return '<div class="fld">'+lab+'<textarea rows="3"'+(f.italic?' style="font-style:italic"':'')+' oninput="setVal(\''+f.id+'\',this.value)">'+esc(v||'')+'</textarea></div>';
   if(f.type==='number') return '<div class="fld">'+lab+'<input type="number" value="'+esc(v??'')+'" oninput="setVal(\''+f.id+'\', this.value===\'\'?\'\':+this.value)"></div>';
   if(f.type==='check') return '<div class="fld">'+lab+'<label style="font-weight:normal;color:var(--ink);display:inline-flex;gap:8px;align-items:center"><input type="checkbox" style="width:auto" '+(v?'checked':'')+' onchange="setVal(\''+f.id+'\',this.checked)"> Sí</label></div>';
   if(f.type==='select'){ const opts='<option value="">—</option>'+(f.options||[]).map(o=>'<option '+(o===v?'selected':'')+'>'+esc(o)+'</option>').join(''); return '<div class="fld">'+lab+'<select onchange="setVal(\''+f.id+'\',this.value)">'+opts+'</select></div>'; }
   if(f.type==='list') return '<div class="fld">'+lab+'<input type="text" value="'+esc((Array.isArray(v)?v:[]).join(', '))+'" placeholder="Separa con comas" oninput="setVal(\''+f.id+'\', splitList(this.value))"></div>';
   if(f.type==='multiselect'){ const arr=Array.isArray(v)?v:[]; const opts=(f.options||[]).map(o=>'<span class="ms-opt '+(arr.includes(o)?'on':'')+'" onclick="toggleMultiVal(\''+f.id+'\',\''+esc(o).replace(/'/g,"\\'")+'\')">'+esc(o)+'</span>').join(''); return '<div class="fld">'+lab+'<div class="ms-box">'+(opts||'<span class="usecount">Sin opciones. Agrégalas en Campos.</span>')+'</div></div>'; }
-  return '<div class="fld">'+lab+'<input type="text" value="'+esc(v||'')+'" oninput="setVal(\''+f.id+'\',this.value)"></div>';
+  return '<div class="fld">'+lab+'<input type="text"'+(f.italic?' style="font-style:italic"':'')+' value="'+esc(v||'')+'" oninput="setVal(\''+f.id+'\',this.value)"></div>';
 }
 function renderFieldInputs(){
   const t=curType();
