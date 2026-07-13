@@ -274,6 +274,7 @@
     <select id="repField" onchange="repCount()"></select>
     <label style="font-weight:normal;color:var(--ink);display:inline-flex;gap:6px;align-items:center;margin-top:12px"><input type="checkbox" id="repCase" style="width:auto" onchange="repCount()"> Distinguir mayúsculas/minúsculas</label>
     <label style="font-weight:normal;color:var(--ink);display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="repVisible" style="width:auto" onchange="repCount()"> Solo los componentes visibles (con filtros y búsqueda actuales)</label>
+    <p class="hint" style="margin-top:8px">En listas desplegables y selección múltiple se reemplaza la opción completa (debe coincidir el valor entero), para no alterar texto dentro de una opción.</p>
     <p class="hint" id="repHint"></p>
     <div class="modal-actions">
       <button class="btn ghost" onclick="closeModal('mReplace')">Cancelar</button>
@@ -799,23 +800,35 @@ function openReplace(){
   openModal('mReplace'); document.getElementById('repFind').focus();
 }
 function repRegex(){ const q=document.getElementById('repFind').value; if(!q)return null; return new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), document.getElementById('repCase').checked?'g':'gi'); }
+function repFullRx(){ const q=document.getElementById('repFind').value; if(!q)return null; return new RegExp('^'+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$', document.getElementById('repCase').checked?'':'i'); }
 function repComps(){ return document.getElementById('repVisible').checked?visibleComponents():curType().components; }
 function repCount(){
   const rx=repRegex(); const el=document.getElementById('repHint'); if(!rx){ el.textContent=''; return; }
-  const flds=repFields(); let hits=0,ncomp=0;
-  repComps().forEach(c=>{ let any=false; flds.forEach(f=>{ const v=c.values[f.id]; const strs=Array.isArray(v)?v:(typeof v==='string'?[v]:[]); strs.forEach(x=>{ const m=String(x).match(rx); if(m){ hits+=m.length; any=true; } }); }); if(any)ncomp++; });
+  const rxF=repFullRx(); const flds=repFields(); let hits=0,ncomp=0;
+  repComps().forEach(c=>{ let any=false; flds.forEach(f=>{ const v=c.values[f.id];
+    if(f.type==='select'){ if(typeof v==='string'&&rxF.test(v)){ hits++; any=true; } }
+    else if(f.type==='multiselect'){ if(Array.isArray(v))v.forEach(x=>{ if(typeof x==='string'&&rxF.test(x)){ hits++; any=true; } }); }
+    else { const strs=Array.isArray(v)?v:(typeof v==='string'?[v]:[]); strs.forEach(x=>{ const m=String(x).match(rx); if(m){ hits+=m.length; any=true; } }); }
+  }); if(any)ncomp++; });
   el.textContent=hits?(hits+' coincidencia'+(hits===1?'':'s')+' en '+ncomp+' componente'+(ncomp===1?'':'s')):'Sin coincidencias';
 }
 function doReplace(){
   const rx=repRegex(); if(!rx){ toast('Escribe el texto a buscar'); return; }
-  const rep=document.getElementById('repWith').value; const flds=repFields(); let hits=0,ncomp=0;
+  const rep=document.getElementById('repWith').value; const rxF=repFullRx(); const flds=repFields(); let hits=0,ncomp=0;
   repComps().forEach(c=>{ let any=false; flds.forEach(f=>{ const v=c.values[f.id];
-    if(typeof v==='string'){ const m=v.match(rx); if(m){ hits+=m.length; any=true; const nv=v.replace(rx,rep); if(nv==='')delete c.values[f.id]; else c.values[f.id]=nv; } }
+    if(f.type==='select'){ if(typeof v==='string'&&rxF.test(v)){ hits++; any=true; if(rep==='')delete c.values[f.id]; else c.values[f.id]=rep; } }
+    else if(f.type==='multiselect'){ if(Array.isArray(v)){ let ch=false; let nv=v.map(x=>{ if(typeof x==='string'&&rxF.test(x)){ hits++; ch=true; return rep; } return x; }).filter(x=>x!==''); nv=[...new Set(nv)]; if(ch){ any=true; if(nv.length)c.values[f.id]=nv; else delete c.values[f.id]; } } }
+    else if(typeof v==='string'){ const m=v.match(rx); if(m){ hits+=m.length; any=true; const nv=v.replace(rx,rep); if(nv==='')delete c.values[f.id]; else c.values[f.id]=nv; } }
     else if(Array.isArray(v)){ let ch=false; const nv=v.map(x=>{ if(typeof x!=='string')return x; const m=x.match(rx); if(m){ hits+=m.length; ch=true; return x.replace(rx,rep); } return x; }).filter(x=>x!==''); if(ch){ any=true; if(nv.length)c.values[f.id]=nv; else delete c.values[f.id]; } }
   }); if(any)ncomp++; });
   let optHits=0;
   flds.forEach(f=>{ if(f.type!=='select'&&f.type!=='multiselect')return; if(!Array.isArray(f.options))return;
-    f.options=f.options.map(o=>{ const m=String(o).match(rx); if(!m)return o; optHits+=m.length; const no=String(o).replace(rx,rep); if(f.colors&&f.colors[o]!==undefined&&no!==o){ if(no!=='')f.colors[no]=f.colors[o]; delete f.colors[o]; } return no; }).filter(o=>o!=='');
+    const seen=new Set(); const out=[];
+    f.options.forEach(o=>{ let no=o;
+      if(rxF.test(String(o))){ optHits++; no=rep; if(f.colors&&f.colors[o]!==undefined&&no!==o){ if(no!==''&&f.colors[no]===undefined)f.colors[no]=f.colors[o]; delete f.colors[o]; } }
+      if(no===''||seen.has(no))return; seen.add(no); out.push(no);
+    });
+    f.options=out;
   });
   if(!hits&&!optHits){ toast('Sin coincidencias'); return; }
   save(); closeModal('mReplace'); render(); toast(hits+' reemplazo'+(hits===1?'':'s')+' en '+ncomp+' componente'+(ncomp===1?'':'s')+(optHits?' (+ opciones de lista actualizadas)':''));
