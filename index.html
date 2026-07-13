@@ -257,7 +257,7 @@
     <h3 id="mEditTitle">Agregar componente</h3>
     <div id="fFields"></div>
     <div class="modal-actions">
-      <button class="btn ghost" onclick="closeModal('mEdit')">Cancelar</button>
+      <button class="btn ghost" onclick="closeEdit()">Cancelar</button>
       <button class="btn primary" onclick="saveEdit()">Guardar</button>
     </div>
   </div>
@@ -340,6 +340,17 @@
     <table><thead><tr><th class="nosort" style="width:110px">Tipo</th><th class="nosort" style="width:200px">Nombre</th><th class="nosort">Efecto</th><th class="nosort" style="width:90px">Usos</th><th class="nosort" style="width:50px"></th></tr></thead><tbody id="libBody"></tbody></table>
     <div class="empty" id="libEmpty" style="display:none">No hay habilidades todavía.</div>
     <div class="modal-actions"><button class="btn primary" onclick="closeLib()">Cerrar</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="mAbilCards" style="z-index:11">
+  <div class="modal wide">
+    <button class="modal-x" onclick="closeAbilCards()" title="Cerrar" aria-label="Cerrar">✕</button>
+    <h3 id="mAbilCardsTitle">Cartas que usan esta habilidad</h3>
+    <div class="hint" style="margin-bottom:10px">Haz clic en “Editar” para abrir la carta. Al cerrar el editor vuelves aquí.</div>
+    <table><thead><tr><th class="nosort" style="width:70px">N°</th><th class="nosort">Carta</th><th class="nosort" style="width:90px"></th></tr></thead><tbody id="abilCardsBody"></tbody></table>
+    <div class="empty" id="abilCardsEmpty" style="display:none">Ninguna carta usa esta habilidad.</div>
+    <div class="modal-actions"><button class="btn primary" onclick="closeAbilCards()">Cerrar</button></div>
   </div>
 </div>
 
@@ -979,7 +990,7 @@ function renderLibColors(){
 }
 function renderLib(){
   const f=libField(); if(!f)return; const lib=[...(f.library||[])].sort((a,b)=>(a.tipo+a.nombre).localeCompare(b.tipo+b.nombre,'es'));
-  document.getElementById('libBody').innerHTML=lib.map(a=>{ const u=abUse(a.id); return '<tr><td><select onchange="updateAbility(\''+a.id+'\',\'tipo\',this.value)">'+['Activa','Pasiva','General'].map(t=>'<option '+(t===a.tipo?'selected':'')+'>'+t+'</option>').join('')+'</select></td><td><input type="text" value="'+esc(a.nombre)+'" onchange="updateAbility(\''+a.id+'\',\'nombre\',this.value)"></td><td><input type="text" value="'+esc(a.texto)+'" onchange="updateAbility(\''+a.id+'\',\'texto\',this.value)"></td><td><span class="usecount">'+u+' carta'+(u===1?'':'s')+'</span></td><td><button class="row-btn" onclick="deleteAbility(\''+a.id+'\')">🗑</button></td></tr>'; }).join('');
+  document.getElementById('libBody').innerHTML=lib.map(a=>{ const u=abUse(a.id); return '<tr><td><select onchange="updateAbility(\''+a.id+'\',\'tipo\',this.value)">'+['Activa','Pasiva','General'].map(t=>'<option '+(t===a.tipo?'selected':'')+'>'+t+'</option>').join('')+'</select></td><td><input type="text" value="'+esc(a.nombre)+'" onchange="updateAbility(\''+a.id+'\',\'nombre\',this.value)"></td><td><input type="text" value="'+esc(a.texto)+'" onchange="updateAbility(\''+a.id+'\',\'texto\',this.value)"></td><td>'+(u>0?'<a class="usecount" style="cursor:pointer;text-decoration:underline" onclick="showAbilCards(\''+a.id+'\')">'+u+' carta'+(u===1?'':'s')+'</a>':'<span class="usecount">0 cartas</span>')+'</td><td><button class="row-btn" onclick="deleteAbility(\''+a.id+'\')">🗑</button></td></tr>'; }).join('');
   document.getElementById('libEmpty').style.display=lib.length?'none':'';
   renderLibColors();
 }
@@ -987,6 +998,19 @@ function addLibAbility(){ libField().library.push({id:uid(),tipo:'Activa',nombre
 function updateAbility(abId,field,val){ const a=libField().library.find(x=>x.id===abId); if(!a)return; a[field]=val; save(); toast('Habilidad actualizada en todas sus cartas'); }
 function deleteAbility(abId){ const f=libField(); const a=f.library.find(x=>x.id===abId); const u=abUse(abId); if(!confirm('¿Eliminar la habilidad "'+a.nombre+'"?'+(u?' Se quitará de '+u+' carta(s).':'')))return; f.library=f.library.filter(x=>x.id!==abId); curType().components.forEach(c=>{ if(Array.isArray(c.values[libFieldId])) c.values[libFieldId]=c.values[libFieldId].filter(h=>h!==abId); }); save(); renderLib(); }
 function closeLib(){ closeModal('mLib'); render(); }
+let abilCardsId=null, abilReturn=null;
+function showAbilCards(abId){
+  abilCardsId=abId; const f=libField(); const a=(f&&f.library||[]).find(x=>x.id===abId);
+  document.getElementById('mAbilCardsTitle').textContent='Cartas que usan: '+((a&&(a.nombre||a.texto))||'');
+  const list=curType().components.filter(c=>Array.isArray(c.values[libFieldId])&&c.values[libFieldId].includes(abId));
+  const sorted=[...list].sort((c1,c2)=>{const n1=(c1.cardNum!=null?c1.cardNum:c1.num)||0,n2=(c2.cardNum!=null?c2.cardNum:c2.num)||0;return n1-n2;});
+  document.getElementById('abilCardsBody').innerHTML=sorted.map(c=>{const n=(c.cardNum!=null?c.cardNum:c.num); return '<tr><td><span class="usecount">'+(n!=null?n:'')+'</span></td><td>'+esc(titleOf(c))+'</td><td><button class="btn ghost mini" onclick="editCardFromAbil(\''+c.id+'\')">✎ Editar</button></td></tr>';}).join('');
+  document.getElementById('abilCardsEmpty').style.display=sorted.length?'none':'';
+  openModal('mAbilCards');
+}
+function closeAbilCards(){ closeModal('mAbilCards'); abilCardsId=null; }
+function editCardFromAbil(cardId){ abilReturn=abilCardsId; closeModal('mAbilCards'); closeModal('mLib'); openEdit(cardId); }
+function closeEdit(){ closeModal('mEdit'); if(abilReturn){ const ab=abilReturn; abilReturn=null; openModal('mLib'); renderLib(); showAbilCards(ab); } }
 
 /* ---------- Conversión de opciones renombradas/eliminadas ---------- */
 function optUse(f,opt){ let n=0; curType().components.forEach(c=>{ const v=c.values[f.id]; if(f.type==='multiselect'){ if(Array.isArray(v)&&v.includes(opt))n++; } else if(v===opt)n++; }); return n; }
@@ -1160,7 +1184,7 @@ function saveEdit(){
   });
   if(editingId){ const c=p.components.find(x=>x.id===editingId); c.values=values; if(editNumVal!=null&&editNumVal!=='')c.num=+editNumVal; if(p.useCardNum){ if(editCardVal===''||editCardVal==null)delete c.cardNum; else c.cardNum=+editCardVal; } toast('Componente actualizado'); }
   else { const nc={id:uid(),num:(editNumVal!=null&&editNumVal!=='')?+editNumVal:nextNum(p),values}; if(p.useCardNum&&editCardVal!==''&&editCardVal!=null)nc.cardNum=+editCardVal; p.components.push(nc); toast('Componente agregado'); }
-  save(); closeModal('mEdit'); render();
+  save(); render(); closeEdit();
 }
 function duplicate(id){ const p=curType(); const c=p.components.find(x=>x.id===id); const pf=primaryField(); const nv=JSON.parse(JSON.stringify(c.values||{})); if(pf)nv[pf.id]=(nv[pf.id]||'')+' (copia)'; const nc={id:uid(),num:nextNum(p),values:nv}; if(p.useCardNum&&c.cardNum!=null)nc.cardNum=nextCardNum(p); p.components.splice(p.components.indexOf(c)+1,0,nc); save(); render(); }
 function removeOne(id){ const c=curType().components.find(x=>x.id===id); if(!confirm('¿Eliminar "'+titleOf(c)+'"?'))return; curType().components=curType().components.filter(x=>x.id!==id); selected.delete(id); save(); render(); }
