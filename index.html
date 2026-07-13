@@ -141,6 +141,9 @@
   .t.General{background:var(--gray-soft); color:var(--muted);}
   .iconrow2{display:grid; grid-template-columns:1fr 90px 56px; gap:8px; align-items:center; margin-bottom:6px;}
   .iconrow2 .icon-tag{justify-self:start;}
+  .tok{display:inline-flex;align-items:center;vertical-align:-3px;}
+  .tok svg,.tok img{width:16px;height:16px;display:block;}
+  .tok-prev svg,.tok-prev img{width:24px;height:24px;}
   .ms-box{display:flex; flex-wrap:wrap; gap:6px;}
   .ms-opt{display:inline-flex; align-items:center; gap:5px; border:1px solid var(--line); padding:5px 9px; border-radius:16px; cursor:pointer; font-size:13px;}
   .ms-opt.on{background:var(--accent-soft); color:var(--accent); border-color:var(--accent);}
@@ -214,6 +217,7 @@
         <button class="btn" onclick="openBulkAdd()">+ Agregar por lote</button>
         <button class="btn primary" onclick="openEdit()">+ Agregar nuevo</button>
         <button class="btn ghost" onclick="openReplace()">⇄ Reemplazar</button>
+        <button class="btn ghost" onclick="openTokens()">🖼 Íconos de texto</button>
         <button class="btn ghost" onclick="openExport()">Exportar ▾</button>
       </div>
       <div class="table-wrap" id="compWrap"></div>
@@ -343,6 +347,17 @@
     <table><thead><tr><th class="nosort">Ícono</th><th class="nosort" style="width:140px">Máx. por carta</th><th class="nosort" style="width:90px">Usos</th><th class="nosort" style="width:50px"></th></tr></thead><tbody id="setBody"></tbody></table>
     <div class="empty" id="setEmpty" style="display:none">Aún no hay íconos.</div>
     <div class="modal-actions"><button class="btn primary" onclick="closeSet()">Cerrar</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="mTokens">
+  <div class="modal wide">
+    <h3>Íconos de texto</h3>
+    <div class="hint" style="margin-bottom:10px">Escribe una palabra entre corchetes — por ejemplo <b>[Productor]</b> — dentro de cualquier texto y las vistas mostrarán su ícono. Al copiar o exportar siempre queda la palabra escrita, nunca el ícono. El plural simple también funciona: [Productores] usa el ícono de «Productor».</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span class="spacer"></span><button class="btn ghost mini" onclick="seedTokens()">Cargar propuesta (cadena trófica)</button><button class="btn primary mini" onclick="addToken()">+ Nuevo ícono</button></div>
+    <table><thead><tr><th class="nosort" style="width:60px">Vista</th><th class="nosort">Palabra</th><th class="nosort" style="width:170px">Ícono</th><th class="nosort" style="width:70px">Color</th><th class="nosort" style="width:120px">Imagen propia</th><th class="nosort" style="width:50px"></th></tr></thead><tbody id="tokBody"></tbody></table>
+    <div class="empty" id="tokEmpty" style="display:none">Aún no hay íconos de texto.</div>
+    <div class="modal-actions"><button class="btn primary" onclick="closeTokens()">Cerrar</button></div>
   </div>
 </div>
 
@@ -656,13 +671,13 @@ function renderComponents(){
 function setCompView(m){ curType().viewMode=m; save(); render(); }
 function cardValHtml(c,f){
   const v=valOf(c,f);
-  if(f.type==='abilities') return (v||[]).map(id=>{const a=(f.library||[]).find(x=>x.id===id); if(!a)return''; const cls=a.tipo==='Activa'?'act':a.tipo==='Pasiva'?'pas':''; return '<span class="chip '+cls+'"'+chipStyle(f,a.tipo)+' title="'+esc(abilityFull(a))+'">'+esc(a.nombre||a.texto)+'</span>';}).join('');
+  if(f.type==='abilities') return (v||[]).map(id=>{const a=(f.library||[]).find(x=>x.id===id); if(!a)return''; const cls=a.tipo==='Activa'?'act':a.tipo==='Pasiva'?'pas':''; return '<span class="chip '+cls+'"'+chipStyle(f,a.tipo)+' title="'+esc(abilityFull(a))+'">'+tok(a.nombre||a.texto)+'</span>';}).join('');
   if(f.type==='icons') return (v||[]).map(x=>'<span class="icon-tag">'+esc(x.tipo)+' ×'+x.cantidad+'</span>').join('');
   if(f.type==='check') return v?'<span class="yes">✓</span>':'<span class="no">—</span>';
-  if(f.type==='multiselect') return (Array.isArray(v)?v:[]).map(x=>{const col=(f.colors||{})[x]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; return '<span class="tag"'+st+'>'+esc(x)+'</span>';}).join('');
-  if(f.type==='list') return (Array.isArray(v)?v:[]).map(x=>'<span class="tag">'+esc(x)+'</span>').join('');
-  if(f.type==='select'){ if(!v)return''; const col=(f.colors||{})[v]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; const cls=col?'':'b-'+String(v).replace(/\s/g,''); return '<span class="badge '+cls+'"'+st+'>'+esc(v)+'</span>'; }
-  return f.italic?'<i>'+esc(v)+'</i>':esc(v);
+  if(f.type==='multiselect') return (Array.isArray(v)?v:[]).map(x=>{const col=(f.colors||{})[x]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; return '<span class="tag"'+st+'>'+tok(x)+'</span>';}).join('');
+  if(f.type==='list') return (Array.isArray(v)?v:[]).map(x=>'<span class="tag">'+tok(x)+'</span>').join('');
+  if(f.type==='select'){ if(!v)return''; const col=(f.colors||{})[v]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; const cls=col?'':'b-'+String(v).replace(/\s/g,''); return '<span class="badge '+cls+'"'+st+'>'+tok(v)+'</span>'; }
+  return f.italic?'<i>'+tok(v)+'</i>':tok(v);
 }
 function cardHtml(c,p,rcField){
   let st='';
@@ -670,7 +685,7 @@ function cardHtml(c,p,rcField){
   const tf=p.fields.find(f=>f.primary);
   const title=tf?(valOf(c,tf)||'(sin título)'):'(sin título)';
   let h='<div class="card-c"'+st+' ondblclick="openEdit(\''+c.id+'\')">';
-  h+='<div class="card-head"><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onclick="event.stopPropagation()" ondblclick="event.stopPropagation()" onchange="toggleSel(\''+c.id+'\',this)"><span class="card-title"><span class="card-num">ID '+(c.num??'')+'</span> '+esc(title)+(p.useCardNum&&c.cardNum!=null?' <span class="icon-tag" title="N° de carta">Carta '+c.cardNum+'</span>':'')+'</span><span class="card-acts" ondblclick="event.stopPropagation()"><button class="row-btn" title="Copiar resumen" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button><button class="row-btn" title="Editar" onclick="event.stopPropagation();openEdit(\''+c.id+'\')">✎</button><button class="row-btn" title="Duplicar" onclick="event.stopPropagation();duplicate(\''+c.id+'\')">⧉</button><button class="row-btn" title="Eliminar" onclick="event.stopPropagation();removeOne(\''+c.id+'\')">🗑</button></span></div>';
+  h+='<div class="card-head"><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onclick="event.stopPropagation()" ondblclick="event.stopPropagation()" onchange="toggleSel(\''+c.id+'\',this)"><span class="card-title"><span class="card-num">ID '+(c.num??'')+'</span> '+tok(title)+(p.useCardNum&&c.cardNum!=null?' <span class="icon-tag" title="N° de carta">Carta '+c.cardNum+'</span>':'')+'</span><span class="card-acts" ondblclick="event.stopPropagation()"><button class="row-btn" title="Copiar resumen" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button><button class="row-btn" title="Editar" onclick="event.stopPropagation();openEdit(\''+c.id+'\')">✎</button><button class="row-btn" title="Duplicar" onclick="event.stopPropagation();duplicate(\''+c.id+'\')">⧉</button><button class="row-btn" title="Eliminar" onclick="event.stopPropagation();removeOne(\''+c.id+'\')">🗑</button></span></div>';
   p.fields.forEach(f=>{ if(f===tf||f.inCard===false)return; const vh=cardValHtml(c,f); if(vh===''||vh==null)return; h+='<div class="card-field"><span class="lbl">'+esc(f.label)+'</span>'+vh+'</div>'; });
   return h+'</div>';
 }
@@ -716,21 +731,21 @@ function cellHtml(c,f){
   const v=valOf(c,f);
   const dcEdit=' ondblclick="editCell(this,\''+c.id+'\',\''+f.id+'\')"';
   const dcOpen=' ondblclick="openEdit(\''+c.id+'\')"';
-  if(f.type==='abilities'){ const chips=(v||[]).map(id=>{const a=(f.library||[]).find(x=>x.id===id); if(!a)return''; const cls=a.tipo==='Activa'?'act':a.tipo==='Pasiva'?'pas':''; return '<span class="chip '+cls+'"'+chipStyle(f,a.tipo)+' title="'+esc(abilityFull(a))+'">'+esc(a.nombre||a.texto)+'</span>';}).join(''); return '<td class="cell-hab ec"'+dcOpen+'>'+chips+'</td>'; }
+  if(f.type==='abilities'){ const chips=(v||[]).map(id=>{const a=(f.library||[]).find(x=>x.id===id); if(!a)return''; const cls=a.tipo==='Activa'?'act':a.tipo==='Pasiva'?'pas':''; return '<span class="chip '+cls+'"'+chipStyle(f,a.tipo)+' title="'+esc(abilityFull(a))+'">'+tok(a.nombre||a.texto)+'</span>';}).join(''); return '<td class="cell-hab ec"'+dcOpen+'>'+chips+'</td>'; }
   if(f.type==='icons'){ const t=(v||[]).map(x=>'<span class="icon-tag">'+esc(x.tipo)+' ×'+x.cantidad+'</span>').join(''); return '<td class="cell-icon ec"'+dcOpen+'>'+t+'</td>'; }
   if(f.type==='check') return '<td class="ec"'+dcEdit+'>'+(v?'<span class="yes">✓</span>':'<span class="no">—</span>')+'</td>';
-  if(f.type==='long'){ const shown=esc(String(v).length>140?String(v).slice(0,140)+'…':v); return '<td class="long ec"'+dcEdit+' title="'+esc(v)+'">'+(f.italic?'<i>'+shown+'</i>':shown)+'</td>'; }
-  if(f.type==='multiselect') return '<td class="ec"'+dcEdit+'>'+(Array.isArray(v)?v:[]).map(x=>{const col=(f.colors||{})[x]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; return '<span class="tag"'+st+'>'+esc(x)+'</span>';}).join('')+'</td>';
-  if(f.type==='list') return '<td class="ec"'+dcEdit+'>'+(Array.isArray(v)?v:[]).map(x=>'<span class="tag">'+esc(x)+'</span>').join('')+'</td>';
-  if(f.type==='select'){ const col=(f.colors||{})[v]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; const cls=col?'':'b-'+String(v).replace(/\s/g,''); return '<td class="ec"'+dcEdit+'>'+(v?'<span class="badge '+cls+'"'+st+'>'+esc(v)+'</span>':'')+'</td>'; }
-  if(f.primary) return '<td class="ec"'+dcEdit+'><b>'+(f.italic?'<i>'+esc(v||'(sin título)')+'</i>':esc(v||'(sin título)'))+'</b></td>';
-  return '<td class="ec"'+dcEdit+'>'+(f.italic?'<i>'+esc(v)+'</i>':esc(v))+'</td>';
+  if(f.type==='long'){ const shown=tok(String(v).length>140?String(v).slice(0,140)+'…':v); return '<td class="long ec"'+dcEdit+' title="'+esc(v)+'">'+(f.italic?'<i>'+shown+'</i>':shown)+'</td>'; }
+  if(f.type==='multiselect') return '<td class="ec"'+dcEdit+'>'+(Array.isArray(v)?v:[]).map(x=>{const col=(f.colors||{})[x]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; return '<span class="tag"'+st+'>'+tok(x)+'</span>';}).join('')+'</td>';
+  if(f.type==='list') return '<td class="ec"'+dcEdit+'>'+(Array.isArray(v)?v:[]).map(x=>'<span class="tag">'+tok(x)+'</span>').join('')+'</td>';
+  if(f.type==='select'){ const col=(f.colors||{})[v]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; const cls=col?'':'b-'+String(v).replace(/\s/g,''); return '<td class="ec"'+dcEdit+'>'+(v?'<span class="badge '+cls+'"'+st+'>'+tok(v)+'</span>':'')+'</td>'; }
+  if(f.primary) return '<td class="ec"'+dcEdit+'><b>'+(f.italic?'<i>'+tok(v||'(sin título)')+'</i>':tok(v||'(sin título)'))+'</b></td>';
+  return '<td class="ec"'+dcEdit+'>'+(f.italic?'<i>'+tok(v)+'</i>':tok(v))+'</td>';
 }
 function summaryText(c){ const t=curType(); const parts=[]; if(t.useCardNum&&c.cardNum!=null) parts.push('N° carta: '+c.cardNum); t.fields.forEach(f=>{ if(f.inSummary===false)return; const val=fieldOut(c,f); if(val!==''&&val!=null) parts.push(f.label+': '+val); }); return parts.join('\n'); }
 function summaryHtml(c){
   const t=curType(); const parts=[];
   if(t.useCardNum&&c.cardNum!=null) parts.push('<b>N° carta:</b> '+c.cardNum);
-  t.fields.forEach(f=>{ if(f.inSummary===false)return; const val=fieldOut(c,f); if(val!==''&&val!=null) parts.push('<b>'+esc(f.label)+':</b> '+(f.italic?'<i>'+esc(val)+'</i>':esc(val))); });
+  t.fields.forEach(f=>{ if(f.inSummary===false)return; const val=fieldOut(c,f); if(val!==''&&val!=null) parts.push('<b>'+esc(f.label)+':</b> '+(f.italic?'<i>'+tok(val)+'</i>':tok(val))); });
   return '<td class="long ec" style="max-width:360px" ondblclick="openEdit(\''+c.id+'\')"><button class="row-btn" title="Copiar resumen" style="float:right;font-size:15px" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button>'+parts.join('<br>')+'</td>';
 }
 function copySummary(cid){ const c=curType().components.find(x=>x.id===cid); if(!c)return; const t=summaryText(c); navigator.clipboard.writeText(t).then(()=>toast('Resumen copiado')).catch(()=>{ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('Resumen copiado'); }); }
@@ -905,6 +920,68 @@ function addLibAbility(){ libField().library.push({id:uid(),tipo:'Activa',nombre
 function updateAbility(abId,field,val){ const a=libField().library.find(x=>x.id===abId); if(!a)return; a[field]=val; save(); toast('Habilidad actualizada en todas sus cartas'); }
 function deleteAbility(abId){ const f=libField(); const a=f.library.find(x=>x.id===abId); const u=abUse(abId); if(!confirm('¿Eliminar la habilidad "'+a.nombre+'"?'+(u?' Se quitará de '+u+' carta(s).':'')))return; f.library=f.library.filter(x=>x.id!==abId); curType().components.forEach(c=>{ if(Array.isArray(c.values[libFieldId])) c.values[libFieldId]=c.values[libFieldId].filter(h=>h!==abId); }); save(); renderLib(); }
 function closeLib(){ closeModal('mLib'); render(); }
+
+/* ---------- Íconos de texto (tokens [Palabra]) ---------- */
+const TOK_GLYPHS={
+  hoja:{label:'Hoja',svg:'<path d="M20 4C20 13 14 20 6 20 6 11 11 4 20 4Z"/><path d="M6 20C9 14 13 9 17 6"/>'},
+  conejo:{label:'Conejo',svg:'<circle cx="12" cy="15" r="5"/><path d="M9.6 10.4C7.8 6.5 7.8 3 9.3 3c1.4 0 2.1 3.4 2.1 6"/><path d="M14.4 10.4C16.2 6.5 16.2 3 14.7 3c-1.4 0-2.1 3.4-2.1 6"/>'},
+  huella:{label:'Huella (garra)',svg:'<ellipse cx="12" cy="16" rx="4.5" ry="3.5"/><circle cx="6.3" cy="10.5" r="1.8"/><circle cx="12" cy="8.3" r="1.8"/><circle cx="17.7" cy="10.5" r="1.8"/>'},
+  hongo:{label:'Hongo',svg:'<path d="M4 12C4 7.5 7.5 4 12 4s8 3.5 8 8H4Z"/><path d="M9.5 12l-.4 5.5a2 2 0 0 0 2 2.5h1.8a2 2 0 0 0 2-2.5L14.5 12"/>'},
+  sol:{label:'Sol',svg:'<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/>'},
+  gota:{label:'Gota',svg:'<path d="M12 3c4 5 7 8.5 7 12a7 7 0 0 1-14 0c0-3.5 3-7 7-12Z"/>'},
+  pez:{label:'Pez',svg:'<path d="M5 12c3-4 6.5-6 10-6 2.5 0 4.5 2 6 6-1.5 4-3.5 6-6 6-3.5 0-7-2-10-6Z"/><path d="M5 12L2 8v8l3-4Z"/><circle cx="16.5" cy="10.5" r=".9"/>'},
+  ave:{label:'Ave',svg:'<path d="M2 13c3-4 6-4 9 0"/><path d="M13 13c3-4 6-4 9 0"/>'},
+  arbol:{label:'Árbol',svg:'<path d="M12 3l6 8h-4l5 6H5l5-6H6l6-8Z"/><path d="M12 17v4"/>'},
+  flor:{label:'Flor',svg:'<circle cx="12" cy="12" r="2.5"/><circle cx="12" cy="5.5" r="2.6"/><circle cx="18" cy="9.8" r="2.6"/><circle cx="15.7" cy="17" r="2.6"/><circle cx="8.3" cy="17" r="2.6"/><circle cx="6" cy="9.8" r="2.6"/>'},
+  insecto:{label:'Insecto',svg:'<ellipse cx="12" cy="14" rx="4.5" ry="6"/><circle cx="12" cy="5.5" r="2.5"/><path d="M12 8.5V20M7.8 11L4 9M16.2 11L20 9M7.5 15H3.5M16.5 15h4M7.8 18l-3.3 2.5M16.2 18l3.3 2.5"/>'},
+  calavera:{label:'Calavera',svg:'<path d="M12 3a8 8 0 0 0-8 8c0 3 1.5 5 3 6v4h10v-4c1.5-1 3-3 3-6a8 8 0 0 0-8-8Z"/><circle cx="9" cy="11" r="1.5"/><circle cx="15" cy="11" r="1.5"/><path d="M12 14.5v2"/>'},
+  rayo:{label:'Rayo',svg:'<path d="M13 2L4 14h6l-1 8 9-12h-6l1-8Z"/>'},
+  estrella:{label:'Estrella',svg:'<path d="M12 3l2.7 5.8L21 9.7l-4.5 4.4 1 6.2L12 17.3 6.4 20.3l1-6.2L3 9.7l6.3-.9L12 3Z"/>'},
+  escudo:{label:'Escudo',svg:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3Z"/>'},
+  corazon:{label:'Corazón',svg:'<path d="M12 20C6 15 3 12 3 8.5 3 6 5 4 7.5 4c2 0 3.5 1 4.5 3 1-2 2.5-3 4.5-3C19 4 21 6 21 8.5c0 3.5-3 6.5-9 11.5Z"/>'},
+  dado:{label:'Dado',svg:'<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2"/><circle cx="15" cy="9" r="1.2"/><circle cx="9" cy="15" r="1.2"/><circle cx="15" cy="15" r="1.2"/>'},
+  moneda:{label:'Moneda',svg:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/>'}
+};
+function tokList(){ const p=proj(); if(!Array.isArray(p.textIcons))p.textIcons=[]; return p.textIcons; }
+function tokNorm(x){ return String(x).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
+function tokMatch(word,palabra){ const w=tokNorm(word),b=tokNorm(palabra); return w===b||w===b+'s'||w===b+'es'; }
+function tokIconHtml(it){ if(it.img)return '<img src="'+it.img+'" alt="">'; const g=TOK_GLYPHS[it.glyph]||TOK_GLYPHS.hoja; return '<svg viewBox="0 0 24 24" fill="none" stroke="'+esc(it.color||'#555')+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">'+g.svg+'</svg>'; }
+function tokApply(str){ const list=tokList(); if(!list.length)return str; return String(str).replace(/\[([^\[\]\n]{1,60})\]/g,(m,w)=>{ const it=list.find(x=>tokMatch(w,x.palabra)); return it?'<span class="tok" title="'+esc(w)+'">'+tokIconHtml(it)+'</span>':m; }); }
+function tok(v){ return tokApply(esc(v)); }
+function openTokens(){ renderTokens(); openModal('mTokens'); }
+function closeTokens(){ closeModal('mTokens'); render(); }
+function renderTokens(){
+  const list=tokList(); const tb=document.getElementById('tokBody'); let h='';
+  list.forEach((it,i)=>{
+    let opts=''; for(const k in TOK_GLYPHS) opts+='<option value="'+k+'" '+(it.glyph===k?'selected':'')+'>'+TOK_GLYPHS[k].label+'</option>';
+    h+='<tr><td><span class="tok tok-prev">'+tokIconHtml(it)+'</span></td>'
+      +'<td><input type="text" value="'+esc(it.palabra)+'" onchange="setTokWord('+i+',this.value)"></td>'
+      +'<td>'+(it.img?'<span class="hint">Imagen propia · </span><button class="btn ghost mini" onclick="clearTokImg('+i+')">usar glifo</button>':'<select onchange="setTokGlyph('+i+',this.value)">'+opts+'</select>')+'</td>'
+      +'<td><input type="color" value="'+esc(it.color||'#555555')+'" onchange="setTokColor('+i+',this.value)" style="width:42px;height:30px;padding:2px"'+(it.img?' disabled':'')+'></td>'
+      +'<td><label class="btn ghost mini" style="cursor:pointer">Subir…<input type="file" accept="image/*" style="display:none" onchange="uploadTok('+i+',this)"></label></td>'
+      +'<td><button class="row-btn" title="Eliminar" onclick="delToken('+i+')">🗑</button></td></tr>';
+  });
+  tb.innerHTML=h;
+  document.getElementById('tokEmpty').style.display=list.length?'none':'';
+}
+function addToken(){ tokList().push({palabra:'Nueva palabra',glyph:'estrella',color:'#6b5d4f'}); save(); renderTokens(); }
+function seedTokens(){
+  const seeds=[['Productor','hoja','#4a7c59'],['C. Primario','conejo','#b98a2f'],['C. Secundario','huella','#b05137'],['Descomponedor','hongo','#7a5aa0']];
+  const l=tokList(); let n=0;
+  seeds.forEach(([w,g,c])=>{ if(!l.some(x=>tokNorm(x.palabra)===tokNorm(w))){ l.push({palabra:w,glyph:g,color:c}); n++; } });
+  save(); renderTokens(); toast(n?('Propuesta cargada: '+n+' íconos'):'La propuesta ya estaba cargada');
+}
+function setTokWord(i,v){ const it=tokList()[i]; if(!it)return; it.palabra=String(v).replace(/[\[\]]/g,'').trim()||it.palabra; save(); renderTokens(); }
+function setTokGlyph(i,v){ const it=tokList()[i]; if(!it)return; it.glyph=v; save(); renderTokens(); }
+function setTokColor(i,v){ const it=tokList()[i]; if(!it)return; it.color=v; save(); renderTokens(); }
+function clearTokImg(i){ const it=tokList()[i]; if(!it)return; delete it.img; save(); renderTokens(); }
+function delToken(i){ const l=tokList(); const it=l[i]; if(!it)return; if(!confirm('¿Eliminar el ícono de "'+it.palabra+'"? Los textos que usen ['+it.palabra+'] volverán a mostrar la palabra.'))return; l.splice(i,1); save(); renderTokens(); }
+function uploadTok(i,inp){
+  const f=inp.files&&inp.files[0]; if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{ const img=new Image(); img.onload=()=>{ const S=48,cv=document.createElement('canvas'); cv.width=S; cv.height=S; const x=cv.getContext('2d'); const r=Math.min(S/img.width,S/img.height); const w=img.width*r,h=img.height*r; x.drawImage(img,(S-w)/2,(S-h)/2,w,h); const it=tokList()[i]; if(!it)return; it.img=cv.toDataURL('image/png'); save(); renderTokens(); toast('Imagen cargada (reducida a 48px)'); }; img.onerror=()=>toast('No se pudo leer la imagen'); img.src=rd.result; };
+  rd.readAsDataURL(f); inp.value='';
+}
 
 /* ---------- Sub-editor: set de íconos de un campo ---------- */
 function setField(){ return fieldById(setFieldId); }
