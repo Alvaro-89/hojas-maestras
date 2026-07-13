@@ -588,7 +588,7 @@ function renderNav(){
   const nav=document.getElementById('navBar');
   if(!typeOpened){ nav.innerHTML=''; return; }
   const t=curType();
-  nav.innerHTML='<button class="btn ghost mini" onclick="backToTypes()">← Tipos</button><span style="font-weight:600;font-size:15px;margin:0 12px 0 6px">'+esc(t.name)+'</span><button class="viewtab '+(currentView==='componentes'?'active':'')+'" onclick="setView(\'componentes\')">Componentes</button><button class="viewtab '+(currentView==='campos'?'active':'')+'" onclick="setView(\'campos\')">Campos</button><span style="flex:1"></span><button class="row-btn" title="Renombrar tipo" onclick="renameType(\''+t.id+'\')">✎</button><button class="row-btn" title="Eliminar tipo" onclick="deleteType()">🗑</button>';
+  nav.innerHTML='<button class="btn ghost mini" onclick="backToTypes()">← Tipos</button><button class="viewtab '+(currentView==='componentes'?'active':'')+'" style="margin-left:6px" onclick="setView(\'componentes\')">'+esc(t.name)+'</button><button class="viewtab '+(currentView==='campos'?'active':'')+'" onclick="setView(\'campos\')">Campos</button><span style="flex:1"></span><button class="row-btn" title="Renombrar tipo" onclick="renameType(\''+t.id+'\')">✎</button><button class="row-btn" title="Eliminar tipo" onclick="deleteType()">🗑</button>';
 }
 function renderTypes(){
   const p=proj();
