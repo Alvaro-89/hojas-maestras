@@ -80,6 +80,9 @@
   .rsz:hover{background:var(--accent); opacity:.35;}
   #compTable td, #compTable th{overflow:hidden;}
   #compTable th{white-space:normal;}
+  #compTable th.col-drag{cursor:grab;}
+  #compTable th.col-drag:active{cursor:grabbing;}
+  #compTable th.drop-target{box-shadow:inset 3px 0 0 var(--accent);}
   .badge{display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; background:var(--gray-soft); color:var(--muted);}
   .b-Idea{background:var(--gray-soft); color:var(--muted);}
   .b-Borrador{background:var(--yellow-soft); color:var(--yellow);}
@@ -629,7 +632,7 @@ function renderComponents(){
   let head='<tr><th class="nosort"><input type="checkbox" id="selAll" onchange="toggleAll(this)"><span class="rsz" onmousedown="startResize(event,\'sel\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'sel\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>';
   head+='<th onclick="setSort(\'_num\')">ID<span class="rsz" onmousedown="startResize(event,\'num\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'num\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>';
   if(p.useCardNum) head+='<th onclick="setSort(\'_cardnum\')">N° carta<span class="rsz" onmousedown="startResize(event,\'cardnum\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'cardnum\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>';
-  p.fields.forEach(f=> head+='<th onclick="setSort(\''+f.id+'\')">'+esc(f.label)+(f.primary?' ★':'')+'<span class="rsz" onmousedown="startResize(event,\''+f.id+'\')" onclick="event.stopPropagation()" ondblclick="autoFit(\''+f.id+'\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>');
+  p.fields.forEach(f=> head+='<th draggable="true" class="col-drag" onclick="setSort(\''+f.id+'\')" ondragstart="colDragStart(event,\''+f.id+'\')" ondragover="colDragOver(event,\''+f.id+'\')" ondragleave="colDragLeave(event)" ondrop="colDrop(event,\''+f.id+'\')" ondragend="colDragEnd(event)" title="Arrastra para reordenar la columna">'+esc(f.label)+(f.primary?' ★':'')+'<span class="rsz" draggable="false" onmousedown="startResize(event,\''+f.id+'\')" onclick="event.stopPropagation()" ondblclick="autoFit(\''+f.id+'\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>');
   head+='<th class="nosort">Resumen<span class="rsz" onmousedown="startResize(event,\'resumen\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'resumen\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th><th class="nosort"><span class="rsz" onmousedown="startResize(event,\'acc\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'acc\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th></tr>';
   const rcField=p.fields.find(f=>f.rowColor&&(f.type==='select'||f.type==='multiselect'));
   const rows=list.map(c=>{ let rs=''; if(rcField){ let rv=valOf(c,rcField); if(Array.isArray(rv))rv=rv[0]; const col=(rcField.colors||{})[rv]; if(col)rs=' style="background:'+hexA(col,0.13)+'"'; } let r='<tr'+rs+'><td><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onchange="toggleSel(\''+c.id+'\',this)"></td>';
@@ -675,6 +678,12 @@ function colDefault(key){ if(key==='sel')return 34; if(key==='num')return 56; if
 function colWidth(key){ const p=curType(); return (p.colW&&p.colW[key])||colDefault(key); }
 function tableWidth(){ const p=curType(); let s=colWidth('sel')+colWidth('num')+(p.useCardNum?colWidth('cardnum'):0); p.fields.forEach(f=>s+=colWidth(f.id)); return s+colWidth('resumen')+colWidth('acc'); }
 function colgroup(){ const p=curType(); let g='<colgroup><col id="col_sel" style="width:'+colWidth('sel')+'px"><col id="col_num" style="width:'+colWidth('num')+'px">'; if(p.useCardNum)g+='<col id="col_cardnum" style="width:'+colWidth('cardnum')+'px">'; p.fields.forEach(f=>g+='<col id="col_'+f.id+'" style="width:'+colWidth(f.id)+'px">'); g+='<col id="col_resumen" style="width:'+colWidth('resumen')+'px"><col id="col_acc" style="width:'+colWidth('acc')+'px"></colgroup>'; return g; }
+let colDragId=null;
+function colDragStart(e,fid){ if(rz){ e.preventDefault(); return; } colDragId=fid; if(e.dataTransfer){ e.dataTransfer.effectAllowed='move'; try{e.dataTransfer.setData('text/plain',fid);}catch(_){}}}
+function colDragOver(e,fid){ if(!colDragId||colDragId===fid)return; e.preventDefault(); if(e.dataTransfer)e.dataTransfer.dropEffect='move'; e.currentTarget.classList.add('drop-target'); }
+function colDragLeave(e){ e.currentTarget.classList.remove('drop-target'); }
+function colDrop(e,fid){ e.preventDefault(); e.currentTarget.classList.remove('drop-target'); if(!colDragId||colDragId===fid)return; const p=curType(); const from=p.fields.findIndex(f=>f.id===colDragId); if(from<0)return; const [m]=p.fields.splice(from,1); const to=p.fields.findIndex(f=>f.id===fid); p.fields.splice(to<0?p.fields.length:to,0,m); colDragId=null; save(); render(); toast('Columna movida'); }
+function colDragEnd(e){ colDragId=null; document.querySelectorAll('#compTable th.drop-target').forEach(th=>th.classList.remove('drop-target')); }
 let rz=null;
 function startResize(e,key){ e.preventDefault(); e.stopPropagation(); rz={key,x:e.clientX,w:colWidth(key)}; document.addEventListener('mousemove',onResize); document.addEventListener('mouseup',endResize); document.body.style.cursor='col-resize'; }
 function onResize(e){ if(!rz)return; const p=curType(); if(!p.colW)p.colW={}; const w=Math.max(40, rz.w+(e.clientX-rz.x)); p.colW[rz.key]=w; const col=document.getElementById('col_'+rz.key); if(col)col.style.width=w+'px'; const t=document.getElementById('compTable'); if(t)t.style.width=tableWidth()+'px'; }
