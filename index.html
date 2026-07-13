@@ -456,7 +456,7 @@ function pushCloud(){
 let state=load();
 let editingId=null, editValues={}, editNumVal=null, editCardVal='';
 let sortKey=null, sortDir=1, filterState={}, exportFmt='texto', currentView='componentes';
-let libFieldId=null, setFieldId=null;
+let libFieldId=null, setFieldId=null, libColorDraft={};
 const selected=new Set();
 let typeOpened=false, promptCb=null, dupTypeId=null;
 
@@ -846,7 +846,7 @@ function deleteField(id){ const p=curType(); const f=fieldById(id); if(p.fields.
 /* ---------- Sub-editor: biblioteca de habilidades de un campo ---------- */
 function libField(){ return fieldById(libFieldId); }
 function abUse(abId){ return curType().components.filter(c=>Array.isArray(c.values[libFieldId])&&c.values[libFieldId].includes(abId)).length; }
-function openAbilityLib(id){ libFieldId=id; document.getElementById('mLibTitle').textContent='Habilidades — '+libField().label; renderLib(); openModal('mLib'); }
+function openAbilityLib(id){ libFieldId=id; libColorDraft=JSON.parse(JSON.stringify(libField().tipoColors||{})); document.getElementById('mLibTitle').textContent='Habilidades — '+libField().label; renderLib(); openModal('mLib'); }
 const ABIL_DEF={Activa:{bg:'#e8f0fa',fg:'#2b6cb0'},Pasiva:{bg:'#e6f2ea',fg:'#2f7d4f'},General:{bg:'#eeece5',fg:'#8a8578'}};
 function chipStyle(f,tipo){ const c=f&&f.tipoColors&&f.tipoColors[tipo]; return c?' style="background:'+c.bg+';color:'+c.fg+'"':''; }
 function abilDraftColor(tipo){ return libColorDraft[tipo]||ABIL_DEF[tipo]||ABIL_DEF.General; }
