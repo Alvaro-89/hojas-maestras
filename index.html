@@ -749,11 +749,11 @@ function summaryHtml(c){
   return '<td class="long ec" style="max-width:360px" ondblclick="openEdit(\''+c.id+'\')"><button class="row-btn" title="Copiar resumen" style="float:right;font-size:15px" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button>'+parts.join('<br>')+'</td>';
 }
 function copySummary(cid){ const c=curType().components.find(x=>x.id===cid); if(!c)return; const t=summaryText(c); navigator.clipboard.writeText(t).then(()=>toast('Resumen copiado')).catch(()=>{ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('Resumen copiado'); }); }
-function repFields(){ const fid=document.getElementById('repField').value; return curType().fields.filter(f=>(f.type==='text'||f.type==='long'||f.type==='list')&&(!fid||f.id===fid)); }
+function repFields(){ const fid=document.getElementById('repField').value; return curType().fields.filter(f=>(f.type==='text'||f.type==='long'||f.type==='list'||f.type==='select'||f.type==='multiselect')&&(!fid||f.id===fid)); }
 function openReplace(){
-  const flds=curType().fields.filter(f=>f.type==='text'||f.type==='long'||f.type==='list');
-  if(!flds.length){ toast('Este tipo no tiene campos de texto donde reemplazar'); return; }
-  document.getElementById('repField').innerHTML='<option value="">Todos los campos de texto</option>'+flds.map(f=>'<option value="'+f.id+'">'+esc(f.label)+'</option>').join('');
+  const flds=curType().fields.filter(f=>f.type==='text'||f.type==='long'||f.type==='list'||f.type==='select'||f.type==='multiselect');
+  if(!flds.length){ toast('Este tipo no tiene campos donde reemplazar'); return; }
+  document.getElementById('repField').innerHTML='<option value="">Todos los campos</option>'+flds.map(f=>'<option value="'+f.id+'">'+esc(f.label)+'</option>').join('');
   document.getElementById('repFind').value=''; document.getElementById('repWith').value=''; document.getElementById('repHint').textContent='';
   openModal('mReplace'); document.getElementById('repFind').focus();
 }
@@ -772,8 +772,12 @@ function doReplace(){
     if(typeof v==='string'){ const m=v.match(rx); if(m){ hits+=m.length; any=true; const nv=v.replace(rx,rep); if(nv==='')delete c.values[f.id]; else c.values[f.id]=nv; } }
     else if(Array.isArray(v)){ let ch=false; const nv=v.map(x=>{ if(typeof x!=='string')return x; const m=x.match(rx); if(m){ hits+=m.length; ch=true; return x.replace(rx,rep); } return x; }).filter(x=>x!==''); if(ch){ any=true; if(nv.length)c.values[f.id]=nv; else delete c.values[f.id]; } }
   }); if(any)ncomp++; });
-  if(!hits){ toast('Sin coincidencias'); return; }
-  save(); closeModal('mReplace'); render(); toast(hits+' reemplazo'+(hits===1?'':'s')+' en '+ncomp+' componente'+(ncomp===1?'':'s'));
+  let optHits=0;
+  flds.forEach(f=>{ if(f.type!=='select'&&f.type!=='multiselect')return; if(!Array.isArray(f.options))return;
+    f.options=f.options.map(o=>{ const m=String(o).match(rx); if(!m)return o; optHits+=m.length; const no=String(o).replace(rx,rep); if(f.colors&&f.colors[o]!==undefined&&no!==o){ if(no!=='')f.colors[no]=f.colors[o]; delete f.colors[o]; } return no; }).filter(o=>o!=='');
+  });
+  if(!hits&&!optHits){ toast('Sin coincidencias'); return; }
+  save(); closeModal('mReplace'); render(); toast(hits+' reemplazo'+(hits===1?'':'s')+' en '+ncomp+' componente'+(ncomp===1?'':'s')+(optHits?' (+ opciones de lista actualizadas)':''));
 }
 function editCell(td,cid,fidId){
   const f=fieldById(fidId); const c=curType().components.find(x=>x.id===cid); if(!f||!c)return;
