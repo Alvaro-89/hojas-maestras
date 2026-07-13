@@ -849,22 +849,39 @@ function abUse(abId){ return curType().components.filter(c=>Array.isArray(c.valu
 function openAbilityLib(id){ libFieldId=id; document.getElementById('mLibTitle').textContent='Habilidades — '+libField().label; renderLib(); openModal('mLib'); }
 const ABIL_DEF={Activa:{bg:'#e8f0fa',fg:'#2b6cb0'},Pasiva:{bg:'#e6f2ea',fg:'#2f7d4f'},General:{bg:'#eeece5',fg:'#8a8578'}};
 function chipStyle(f,tipo){ const c=f&&f.tipoColors&&f.tipoColors[tipo]; return c?' style="background:'+c.bg+';color:'+c.fg+'"':''; }
-function setAbilColor(tipo,which,hex){ const f=libField(); if(!f)return; if(!f.tipoColors)f.tipoColors={}; if(!f.tipoColors[tipo])f.tipoColors[tipo]=Object.assign({},ABIL_DEF[tipo]||ABIL_DEF.General); f.tipoColors[tipo][which]=hex; save(); renderLib(); }
-function clearAbilColor(tipo){ const f=libField(); if(f&&f.tipoColors){ delete f.tipoColors[tipo]; if(!Object.keys(f.tipoColors).length)delete f.tipoColors; } save(); renderLib(); }
+function abilDraftColor(tipo){ return libColorDraft[tipo]||ABIL_DEF[tipo]||ABIL_DEF.General; }
+function libColorsDirty(){ const cur=JSON.stringify(libField().tipoColors||{}); return JSON.stringify(libColorDraft)!==cur; }
+function previewAbilColor(tipo,which,hex){
+  if(!libColorDraft[tipo]) libColorDraft[tipo]=Object.assign({},ABIL_DEF[tipo]||ABIL_DEF.General);
+  libColorDraft[tipo][which]=hex;
+  const chip=document.getElementById('abilprev_'+tipo); if(chip){ const c=libColorDraft[tipo]; chip.style.background=c.bg; chip.style.color=c.fg; }
+  updateLibColorBar();
+}
+function resetAbilColorDraft(tipo){ delete libColorDraft[tipo]; renderLibColors(); }
+function applyAbilColors(){
+  const f=libField(); if(!f)return;
+  const out={}; Object.keys(libColorDraft).forEach(t=>{ const c=libColorDraft[t]; if(c&&c.bg&&c.fg)out[t]={bg:c.bg,fg:c.fg}; });
+  if(Object.keys(out).length)f.tipoColors=out; else delete f.tipoColors;
+  libColorDraft=JSON.parse(JSON.stringify(f.tipoColors||{}));
+  save(); render(); renderLibColors(); toast('Colores aplicados');
+}
+function discardAbilColors(){ libColorDraft=JSON.parse(JSON.stringify(libField().tipoColors||{})); renderLibColors(); }
+function updateLibColorBar(){ const bar=document.getElementById('libColorBar'); if(!bar)return; const dirty=libColorsDirty(); bar.innerHTML=dirty?'<span class="usecount" style="color:var(--accent)">Cambios sin aplicar</span> <button class="btn primary mini" onclick="applyAbilColors()">Aplicar colores</button> <button class="btn ghost mini" onclick="discardAbilColors()">Descartar</button>':'<span class="usecount">Colores guardados</span>'; }
 function renderLibColors(){
   const f=libField(); const box=document.getElementById('libColors'); if(!f||!box)return;
-  let h='<div style="font-size:12px; font-weight:600; color:var(--muted); margin-bottom:8px">Colores de las etiquetas por tipo</div>';
+  let h='<div style="font-size:12px; font-weight:600; color:var(--muted); margin-bottom:8px">Colores de las etiquetas por tipo <span style="font-weight:normal">— elige y luego pulsa «Aplicar colores»</span></div>';
   ['Activa','Pasiva','General'].forEach(tipo=>{
-    const custom=f.tipoColors&&f.tipoColors[tipo]; const c=custom||ABIL_DEF[tipo];
+    const isCustom=!!libColorDraft[tipo]; const c=abilDraftColor(tipo);
     h+='<div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:7px">'
      +'<span style="width:64px; font-weight:600; font-size:13px">'+tipo+'</span>'
-     +'<label style="font-size:12px; color:var(--muted); display:inline-flex; align-items:center; gap:5px">Fondo <input type="color" value="'+c.bg+'" oninput="setAbilColor(\''+tipo+'\',\'bg\',this.value)" style="width:34px; height:26px; padding:0; border:1px solid var(--line); border-radius:5px; background:none; cursor:pointer"></label>'
-     +'<label style="font-size:12px; color:var(--muted); display:inline-flex; align-items:center; gap:5px">Texto <input type="color" value="'+c.fg+'" oninput="setAbilColor(\''+tipo+'\',\'fg\',this.value)" style="width:34px; height:26px; padding:0; border:1px solid var(--line); border-radius:5px; background:none; cursor:pointer"></label>'
-     +'<span class="chip" style="background:'+c.bg+'; color:'+c.fg+'">Ejemplo '+tipo.toLowerCase()+'</span>'
-     +(custom?'<button class="btn ghost mini" onclick="clearAbilColor(\''+tipo+'\')">Restaurar</button>':'<span class="usecount">predeterminado</span>')
+     +'<label style="font-size:12px; color:var(--muted); display:inline-flex; align-items:center; gap:5px">Fondo <input type="color" value="'+c.bg+'" oninput="previewAbilColor(\''+tipo+'\',\'bg\',this.value)" style="width:34px; height:26px; padding:0; border:1px solid var(--line); border-radius:5px; background:none; cursor:pointer"></label>'
+     +'<label style="font-size:12px; color:var(--muted); display:inline-flex; align-items:center; gap:5px">Texto <input type="color" value="'+c.fg+'" oninput="previewAbilColor(\''+tipo+'\',\'fg\',this.value)" style="width:34px; height:26px; padding:0; border:1px solid var(--line); border-radius:5px; background:none; cursor:pointer"></label>'
+     +'<span class="chip" id="abilprev_'+tipo+'" style="background:'+c.bg+'; color:'+c.fg+'">Ejemplo '+tipo.toLowerCase()+'</span>'
+     +(isCustom?'<button class="btn ghost mini" onclick="resetAbilColorDraft(\''+tipo+'\')">Restaurar</button>':'<span class="usecount">predeterminado</span>')
      +'</div>';
   });
-  box.innerHTML=h;
+  h+='<div id="libColorBar" style="margin-top:10px; display:flex; align-items:center; gap:8px"></div>';
+  box.innerHTML=h; updateLibColorBar();
 }
 function renderLib(){
   const f=libField(); if(!f)return; const lib=[...(f.library||[])].sort((a,b)=>(a.tipo+a.nombre).localeCompare(b.tipo+b.nombre,'es'));
