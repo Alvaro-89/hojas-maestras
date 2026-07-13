@@ -76,7 +76,7 @@
   td .row-btn:hover{opacity:1;}
   td.ec{cursor:cell;}
   .cell-edit{width:100%; padding:4px 6px; border:1px solid var(--accent); border-radius:5px; font-size:13px; font-family:inherit; resize:vertical;}
-  .rsz{position:absolute; top:0; right:0; width:8px; height:100%; cursor:col-resize; z-index:2;}
+  .rsz{position:absolute; top:0; right:-4px; width:12px; height:100%; cursor:col-resize; z-index:2;}
   .rsz:hover{background:var(--accent); opacity:.35;}
   #compTable td, #compTable th{overflow:hidden;}
   #compTable th{white-space:normal;}
@@ -622,11 +622,11 @@ function renderComponents(){
   p.fields.forEach(f=>{ if(f.type==='abilities'||f.type==='icons')return; so+='<option value="'+f.id+'" '+(sortKey===f.id?'selected':'')+'>Orden: '+esc(f.label)+'</option>'; });
   sb.innerHTML='<select onchange="setSortSel(this.value)">'+so+'</select>'+(sortKey?' <button class="btn ghost mini" title="Invertir orden" onclick="toggleSortDir()">'+(sortDir===1?'↑':'↓')+'</button>':'')+((Object.keys(filterState).length||sortKey)?' <button class="btn ghost mini" title="Quitar filtros y orden" onclick="clearFiltros()">×</button>':'');
   const list=visibleComponents();
-  let head='<tr><th class="nosort"><input type="checkbox" id="selAll" onchange="toggleAll(this)"><span class="rsz" onmousedown="startResize(event,\'sel\')" onclick="event.stopPropagation()"></span></th>';
-  head+='<th onclick="setSort(\'_num\')">ID<span class="rsz" onmousedown="startResize(event,\'num\')" onclick="event.stopPropagation()"></span></th>';
-  if(p.useCardNum) head+='<th onclick="setSort(\'_cardnum\')">N° carta<span class="rsz" onmousedown="startResize(event,\'cardnum\')" onclick="event.stopPropagation()"></span></th>';
-  p.fields.forEach(f=> head+='<th onclick="setSort(\''+f.id+'\')">'+esc(f.label)+(f.primary?' ★':'')+'<span class="rsz" onmousedown="startResize(event,\''+f.id+'\')" onclick="event.stopPropagation()"></span></th>');
-  head+='<th class="nosort">Resumen<span class="rsz" onmousedown="startResize(event,\'resumen\')" onclick="event.stopPropagation()"></span></th><th class="nosort"><span class="rsz" onmousedown="startResize(event,\'acc\')" onclick="event.stopPropagation()"></span></th></tr>';
+  let head='<tr><th class="nosort"><input type="checkbox" id="selAll" onchange="toggleAll(this)"><span class="rsz" onmousedown="startResize(event,\'sel\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'sel\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>';
+  head+='<th onclick="setSort(\'_num\')">ID<span class="rsz" onmousedown="startResize(event,\'num\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'num\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>';
+  if(p.useCardNum) head+='<th onclick="setSort(\'_cardnum\')">N° carta<span class="rsz" onmousedown="startResize(event,\'cardnum\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'cardnum\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>';
+  p.fields.forEach(f=> head+='<th onclick="setSort(\''+f.id+'\')">'+esc(f.label)+(f.primary?' ★':'')+'<span class="rsz" onmousedown="startResize(event,\''+f.id+'\')" onclick="event.stopPropagation()" ondblclick="autoFit(\''+f.id+'\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>');
+  head+='<th class="nosort">Resumen<span class="rsz" onmousedown="startResize(event,\'resumen\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'resumen\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th><th class="nosort"><span class="rsz" onmousedown="startResize(event,\'acc\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'acc\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th></tr>';
   const rcField=p.fields.find(f=>f.rowColor&&(f.type==='select'||f.type==='multiselect'));
   const rows=list.map(c=>{ let rs=''; if(rcField){ let rv=valOf(c,rcField); if(Array.isArray(rv))rv=rv[0]; const col=(rcField.colors||{})[rv]; if(col)rs=' style="background:'+hexA(col,0.13)+'"'; } let r='<tr'+rs+'><td><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onchange="toggleSel(\''+c.id+'\',this)"></td>';
     r+='<td style="color:var(--muted);font-weight:600">'+(c.num??'')+'</td>';
@@ -691,7 +691,7 @@ function autoFit(key){
   });
   meas.remove();
   w=Math.min(w,520);
-  if(!p.colW)p.colW={}; p.colW[key]=w; save(); render();
+  if(!p.colW)p.colW={}; p.colW[key]=w; save(); render(); toast('Ancho ajustado');
 }
 document.addEventListener('dblclick',e=>{
   const h=(e.target&&e.target.closest)?e.target.closest('.rsz'):null; if(!h)return;
