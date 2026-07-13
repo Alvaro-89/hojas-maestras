@@ -208,6 +208,7 @@
         <button class="btn" id="bulkEditBtn" onclick="openBulkEdit()" disabled>Editar selección</button>
         <button class="btn" onclick="openBulkAdd()">+ Agregar por lote</button>
         <button class="btn primary" onclick="openEdit()">+ Agregar nuevo</button>
+        <button class="btn ghost" onclick="openReplace()">⇄ Reemplazar</button>
         <button class="btn ghost" onclick="openExport()">Exportar ▾</button>
       </div>
       <div class="table-wrap" id="compWrap"></div>
@@ -246,6 +247,25 @@
     <div class="modal-actions">
       <button class="btn ghost" onclick="closeModal('mEdit')">Cancelar</button>
       <button class="btn primary" onclick="saveEdit()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="mReplace">
+  <div class="modal">
+    <h3>Buscar y reemplazar</h3>
+    <label>Buscar</label>
+    <input type="text" id="repFind" oninput="repCount()" onkeydown="if(event.key==='Enter')doReplace()">
+    <label>Reemplazar con</label>
+    <input type="text" id="repWith" onkeydown="if(event.key==='Enter')doReplace()">
+    <label>Campo</label>
+    <select id="repField" onchange="repCount()"></select>
+    <label style="font-weight:normal;color:var(--ink);display:inline-flex;gap:6px;align-items:center;margin-top:12px"><input type="checkbox" id="repCase" style="width:auto" onchange="repCount()"> Distinguir mayúsculas/minúsculas</label>
+    <label style="font-weight:normal;color:var(--ink);display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="repVisible" style="width:auto" onchange="repCount()"> Solo los componentes visibles (con filtros y búsqueda actuales)</label>
+    <p class="hint" id="repHint"></p>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeModal('mReplace')">Cancelar</button>
+      <button class="btn primary" onclick="doReplace()">Reemplazar todo</button>
     </div>
   </div>
 </div>
@@ -676,6 +696,32 @@ function summaryHtml(c){
   return '<td class="long ec" style="max-width:360px" ondblclick="openEdit(\''+c.id+'\')"><button class="row-btn" title="Copiar resumen" style="float:right;font-size:15px" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button>'+parts.join('<br>')+'</td>';
 }
 function copySummary(cid){ const c=curType().components.find(x=>x.id===cid); if(!c)return; const t=summaryText(c); navigator.clipboard.writeText(t).then(()=>toast('Resumen copiado')).catch(()=>{ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('Resumen copiado'); }); }
+function repFields(){ const fid=document.getElementById('repField').value; return curType().fields.filter(f=>(f.type==='text'||f.type==='long'||f.type==='list')&&(!fid||f.id===fid)); }
+function openReplace(){
+  const flds=curType().fields.filter(f=>f.type==='text'||f.type==='long'||f.type==='list');
+  if(!flds.length){ toast('Este tipo no tiene campos de texto donde reemplazar'); return; }
+  document.getElementById('repField').innerHTML='<option value="">Todos los campos de texto</option>'+flds.map(f=>'<option value="'+f.id+'">'+esc(f.label)+'</option>').join('');
+  document.getElementById('repFind').value=''; document.getElementById('repWith').value=''; document.getElementById('repHint').textContent='';
+  openModal('mReplace'); document.getElementById('repFind').focus();
+}
+function repRegex(){ const q=document.getElementById('repFind').value; if(!q)return null; return new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), document.getElementById('repCase').checked?'g':'gi'); }
+function repComps(){ return document.getElementById('repVisible').checked?visibleComponents():curType().components; }
+function repCount(){
+  const rx=repRegex(); const el=document.getElementById('repHint'); if(!rx){ el.textContent=''; return; }
+  const flds=repFields(); let hits=0,ncomp=0;
+  repComps().forEach(c=>{ let any=false; flds.forEach(f=>{ const v=c.values[f.id]; const strs=Array.isArray(v)?v:(typeof v==='string'?[v]:[]); strs.forEach(x=>{ const m=String(x).match(rx); if(m){ hits+=m.length; any=true; } }); }); if(any)ncomp++; });
+  el.textContent=hits?(hits+' coincidencia'+(hits===1?'':'s')+' en '+ncomp+' componente'+(ncomp===1?'':'s')):'Sin coincidencias';
+}
+function doReplace(){
+  const rx=repRegex(); if(!rx){ toast('Escribe el texto a buscar'); return; }
+  const rep=document.getElementById('repWith').value; const flds=repFields(); let hits=0,ncomp=0;
+  repComps().forEach(c=>{ let any=false; flds.forEach(f=>{ const v=c.values[f.id];
+    if(typeof v==='string'){ const m=v.match(rx); if(m){ hits+=m.length; any=true; const nv=v.replace(rx,rep); if(nv==='')delete c.values[f.id]; else c.values[f.id]=nv; } }
+    else if(Array.isArray(v)){ let ch=false; const nv=v.map(x=>{ if(typeof x!=='string')return x; const m=x.match(rx); if(m){ hits+=m.length; ch=true; return x.replace(rx,rep); } return x; }).filter(x=>x!==''); if(ch){ any=true; if(nv.length)c.values[f.id]=nv; else delete c.values[f.id]; } }
+  }); if(any)ncomp++; });
+  if(!hits){ toast('Sin coincidencias'); return; }
+  save(); closeModal('mReplace'); render(); toast(hits+' reemplazo'+(hits===1?'':'s')+' en '+ncomp+' componente'+(ncomp===1?'':'s'));
+}
 function editCell(td,cid,fidId){
   const f=fieldById(fidId); const c=curType().components.find(x=>x.id===cid); if(!f||!c)return;
   if(f.type==='multiselect'){ openEdit(cid); return; }
