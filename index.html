@@ -361,6 +361,15 @@
   </div>
 </div>
 
+<div class="overlay" id="mRemap">
+  <div class="modal">
+    <h3>Convertir valores de las cartas</h3>
+    <div class="hint" id="remapHint" style="margin-bottom:10px"></div>
+    <table><thead><tr><th class="nosort">Opción anterior</th><th class="nosort" style="width:40px"></th><th class="nosort">Se convierte en</th></tr></thead><tbody id="remapBody"></tbody></table>
+    <div class="modal-actions"><button class="btn ghost" onclick="skipRemap()">No convertir</button><button class="btn primary" onclick="applyRemap()">Convertir</button></div>
+  </div>
+</div>
+
 <div class="overlay" id="mColors">
   <div class="modal">
     <h3 id="mColorsTitle">Colores</h3>
@@ -855,7 +864,13 @@ function updateField(id,field,val){
   const f=fieldById(id); if(!f)return;
   if(field==='label'){ f.label=val.trim()||f.label; }
   else if(field==='type'){ f.type=val; delete f.options; delete f.library; delete f.iconSet; delete f.colors; delete f.rowColor; if(val==='select'||val==='multiselect')f.options=[]; if(val==='abilities')f.library=[]; if(val==='icons')f.iconSet=[]; save(); renderFields(); return; }
-  else if(field==='options'){ f.options=splitList(val); }
+  else if(field==='options'){
+    const oldO=Array.isArray(f.options)?[...f.options]:[];
+    f.options=splitList(val);
+    const newO=f.options;
+    const removed=oldO.filter(o=>!newO.includes(o)).filter(o=>optUse(f,o)>0);
+    if(removed.length){ save(); openRemap(f.id,removed,newO.filter(o=>!oldO.includes(o))); return; }
+  }
   save(); toast('Campo actualizado');
 }
 function toggleInSummary(id,on){ const f=fieldById(id); if(!f)return; if(on)delete f.inSummary; else f.inSummary=false; save(); }
@@ -924,6 +939,36 @@ function addLibAbility(){ libField().library.push({id:uid(),tipo:'Activa',nombre
 function updateAbility(abId,field,val){ const a=libField().library.find(x=>x.id===abId); if(!a)return; a[field]=val; save(); toast('Habilidad actualizada en todas sus cartas'); }
 function deleteAbility(abId){ const f=libField(); const a=f.library.find(x=>x.id===abId); const u=abUse(abId); if(!confirm('¿Eliminar la habilidad "'+a.nombre+'"?'+(u?' Se quitará de '+u+' carta(s).':'')))return; f.library=f.library.filter(x=>x.id!==abId); curType().components.forEach(c=>{ if(Array.isArray(c.values[libFieldId])) c.values[libFieldId]=c.values[libFieldId].filter(h=>h!==abId); }); save(); renderLib(); }
 function closeLib(){ closeModal('mLib'); render(); }
+
+/* ---------- Conversión de opciones renombradas/eliminadas ---------- */
+function optUse(f,opt){ let n=0; curType().components.forEach(c=>{ const v=c.values[f.id]; if(f.type==='multiselect'){ if(Array.isArray(v)&&v.includes(opt))n++; } else if(v===opt)n++; }); return n; }
+let remapFieldId=null, remapOld=[];
+function openRemap(fid,removed,added){
+  remapFieldId=fid; remapOld=removed;
+  const f=fieldById(fid);
+  document.getElementById('remapHint').innerHTML='Cambiaste las opciones de <b>'+esc(f.label)+'</b>. Hay cartas que todavía usan opciones que ya no existen. Indica en qué se convierte cada una:';
+  document.getElementById('remapBody').innerHTML=removed.map((o,i)=>{
+    const n=optUse(f,o);
+    let opts='<option value="__keep__">(dejar el valor antiguo)</option><option value="__clear__">(vaciar el campo)</option>'+(f.options||[]).map(x=>'<option value="'+esc(x)+'"'+((added.length===removed.length&&added[i]===x)?' selected':'')+'>'+esc(x)+'</option>').join('');
+    return '<tr><td><b>'+esc(o)+'</b> <span class="usecount">'+n+' carta'+(n===1?'':'s')+'</span></td><td style="text-align:center">→</td><td><select id="remapSel_'+i+'">'+opts+'</select></td></tr>';
+  }).join('');
+  openModal('mRemap');
+}
+function applyRemap(){
+  const f=fieldById(remapFieldId); if(!f){ closeModal('mRemap'); return; }
+  let n=0;
+  remapOld.forEach((o,i)=>{
+    const sel=document.getElementById('remapSel_'+i); const to=sel?sel.value:'__keep__';
+    if(to==='__keep__')return;
+    curType().components.forEach(c=>{ const v=c.values[f.id];
+      if(f.type==='multiselect'){ if(Array.isArray(v)&&v.includes(o)){ let nv=v.filter(x=>x!==o); if(to!=='__clear__'&&!nv.includes(to))nv.push(to); if(nv.length)c.values[f.id]=nv; else delete c.values[f.id]; n++; } }
+      else if(v===o){ if(to==='__clear__')delete c.values[f.id]; else c.values[f.id]=to; n++; }
+    });
+    if(to!=='__clear__'&&f.colors&&f.colors[o]!==undefined){ if(f.colors[to]===undefined)f.colors[to]=f.colors[o]; delete f.colors[o]; }
+  });
+  save(); closeModal('mRemap'); render(); renderFields(); toast(n?('Convertidas '+n+' carta'+(n===1?'':'s')):'Sin cambios en las cartas');
+}
+function skipRemap(){ closeModal('mRemap'); renderFields(); toast('Las cartas conservan los valores antiguos'); }
 
 /* ---------- Íconos de texto (tokens [Palabra]) ---------- */
 const TOK_GLYPHS={
