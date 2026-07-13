@@ -229,6 +229,7 @@
             <th class="nosort" style="width:170px">Tipo</th>
             <th class="nosort">Opciones / configuración</th>
             <th class="nosort" style="width:90px">En resumen</th>
+            <th class="nosort" style="width:90px">En tarjeta</th>
             <th class="nosort" style="width:70px">Título</th>
             <th class="nosort" style="width:50px"></th>
           </tr></thead>
@@ -663,7 +664,7 @@ function cardHtml(c,p,rcField){
   const title=tf?(valOf(c,tf)||'(sin título)'):'(sin título)';
   let h='<div class="card-c"'+st+' ondblclick="openEdit(\''+c.id+'\')">';
   h+='<div class="card-head"><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onclick="event.stopPropagation()" ondblclick="event.stopPropagation()" onchange="toggleSel(\''+c.id+'\',this)"><span class="card-title"><span class="card-num">ID '+(c.num??'')+'</span> '+esc(title)+(p.useCardNum&&c.cardNum!=null?' <span class="icon-tag" title="N° de carta">Carta '+c.cardNum+'</span>':'')+'</span><span class="card-acts" ondblclick="event.stopPropagation()"><button class="row-btn" title="Copiar resumen" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button><button class="row-btn" title="Editar" onclick="event.stopPropagation();openEdit(\''+c.id+'\')">✎</button><button class="row-btn" title="Duplicar" onclick="event.stopPropagation();duplicate(\''+c.id+'\')">⧉</button><button class="row-btn" title="Eliminar" onclick="event.stopPropagation();removeOne(\''+c.id+'\')">🗑</button></span></div>';
-  p.fields.forEach(f=>{ if(f===tf)return; const vh=cardValHtml(c,f); if(vh===''||vh==null)return; h+='<div class="card-field"><span class="lbl">'+esc(f.label)+'</span>'+vh+'</div>'; });
+  p.fields.forEach(f=>{ if(f===tf||f.inCard===false)return; const vh=cardValHtml(c,f); if(vh===''||vh==null)return; h+='<div class="card-field"><span class="lbl">'+esc(f.label)+'</span>'+vh+'</div>'; });
   return h+'</div>';
 }
 function colDefault(key){ if(key==='sel')return 34; if(key==='num')return 56; if(key==='cardnum')return 80; if(key==='acc')return 90; if(key==='resumen')return 320; const f=fieldById(key); if(!f)return 150; return ({number:70,check:60,select:140,long:240,abilities:240,icons:150,multiselect:170,list:150})[f.type]||150; }
@@ -784,6 +785,7 @@ function renderFields(){
       '<td><select onchange="updateField(\''+f.id+'\',\'type\',this.value)">'+typeOpts+'</select></td>'+
       '<td>'+cfg+'</td>'+
       '<td style="text-align:center"><input type="checkbox" '+(f.inSummary!==false?'checked':'')+' onchange="toggleInSummary(\''+f.id+'\',this.checked)"></td>'+
+      '<td style="text-align:center"><input type="checkbox" '+(f.inCard!==false?'checked':'')+' onchange="toggleInCard(\''+f.id+'\',this.checked)"></td>'+
       '<td style="text-align:center"><input type="radio" name="primaryField" '+(f.primary?'checked':'')+' onchange="setPrimary(\''+f.id+'\')"></td>'+
       '<td style="white-space:nowrap"><button class="row-btn" title="Duplicar campo" onclick="duplicateField(\''+f.id+'\')">⧉</button><button class="row-btn" onclick="deleteField(\''+f.id+'\')">🗑</button></td></tr>';
   }).join('');
@@ -800,6 +802,7 @@ function updateField(id,field,val){
   save(); toast('Campo actualizado');
 }
 function toggleInSummary(id,on){ const f=fieldById(id); if(!f)return; if(on)delete f.inSummary; else f.inSummary=false; save(); }
+function toggleInCard(id,on){ const f=fieldById(id); if(!f)return; if(on)delete f.inCard; else f.inCard=false; save(); }
 function setPrimary(id){ curType().fields.forEach(f=>f.primary=(f.id===id)); save(); toast('Campo título actualizado'); }
 function moveField(i,dir){ const a=curType().fields, j=i+dir; if(j<0||j>=a.length)return; const t=a[i]; a[i]=a[j]; a[j]=t; save(); renderFields(); }
 function duplicateField(id){
