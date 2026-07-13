@@ -210,7 +210,7 @@
     </div>
 
     <div id="viewTypes" class="view">
-      <div class="toolbar"><span class="spacer"></span><button class="btn ghost" onclick="openTokens()">🖼 Íconos de texto</button><button class="btn ghost" onclick="openExport('project')">Exportar juego ▾</button></div>
+      <div class="toolbar"><span class="spacer"></span><button class="btn ghost" onclick="openTokens()">🖼 Iconografía</button><button class="btn ghost" onclick="openExport('project')">Exportar juego ▾</button></div>
       <div class="table-wrap"><div class="tiles" id="typeTiles"></div></div>
     </div>
 
@@ -371,11 +371,11 @@
 
 <div class="overlay" id="mTokens">
   <div class="modal wide">
-    <h3>Íconos de texto</h3>
+    <h3>Iconografía</h3>
     <div class="hint" style="margin-bottom:10px">Escribe una palabra entre corchetes — por ejemplo <b>[Productor]</b> — dentro de cualquier texto y las vistas mostrarán su ícono. Al copiar o exportar siempre queda la palabra escrita, nunca el ícono. Singular y plural funcionan indistintamente: [Productor] y [Productores] usan el mismo ícono.</div>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span class="spacer"></span><button class="btn ghost mini" onclick="seedTokens()">Cargar propuesta (cadena trófica)</button><button class="btn primary mini" onclick="addToken()">+ Nuevo ícono</button></div>
-    <table><thead><tr><th class="nosort" style="width:60px">Vista</th><th class="nosort">Palabra</th><th class="nosort" style="width:170px">Ícono</th><th class="nosort" style="width:70px">Color</th><th class="nosort" style="width:120px">Imagen propia</th><th class="nosort" style="width:50px"></th></tr></thead><tbody id="tokBody"></tbody></table>
-    <div class="empty" id="tokEmpty" style="display:none">Aún no hay íconos de texto.</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><input type="text" id="tokSearch" placeholder="Buscar ícono…" oninput="renderTokens()" style="width:200px"><span class="spacer"></span><button class="btn ghost mini" onclick="seedTokens()">Cargar propuesta (cadena trófica)</button><button class="btn primary mini" onclick="addToken()">+ Nuevo ícono</button></div>
+    <table><thead><tr><th class="nosort" style="width:64px">Orden</th><th class="nosort" style="width:60px">Vista</th><th class="nosort">Palabra</th><th class="nosort" style="width:170px">Ícono</th><th class="nosort" style="width:70px">Color</th><th class="nosort" style="width:120px">Imagen propia</th><th class="nosort" style="width:50px"></th></tr></thead><tbody id="tokBody"></tbody></table>
+    <div class="empty" id="tokEmpty" style="display:none">Aún no hay íconos.</div>
     <div class="modal-actions"><button class="btn primary" onclick="closeTokens()">Cerrar</button></div>
   </div>
 </div>
@@ -1083,13 +1083,18 @@ function tokMatch(word,palabra){ const a=tokForms(word),b=tokForms(palabra); for
 function tokIconHtml(it){ if(it.img)return '<img src="'+it.img+'" alt="">'; const g=TOK_GLYPHS[it.glyph]||TOK_GLYPHS.hoja; return '<svg viewBox="0 0 24 24" fill="none" stroke="'+esc(it.color||'#555')+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">'+g.svg+'</svg>'; }
 function tokApply(str){ const list=tokList(); if(!list.length)return str; return String(str).replace(/\[([^\[\]\n]{1,60})\]/g,(m,w)=>{ const it=list.find(x=>tokMatch(w,x.palabra)); return it?'<span class="tok" title="'+esc(w)+'">'+tokIconHtml(it)+'</span>':m; }); }
 function tok(v){ return tokApply(esc(v)); }
-function openTokens(){ renderTokens(); openModal('mTokens'); }
+function openTokens(){ const sIn=document.getElementById('tokSearch'); if(sIn)sIn.value=''; renderTokens(); openModal('mTokens'); }
 function closeTokens(){ closeModal('mTokens'); render(); }
 function renderTokens(){
   const list=tokList(); const tb=document.getElementById('tokBody'); let h='';
+  const sIn=document.getElementById('tokSearch'); const q=tokNorm(sIn?sIn.value:'');
+  let visibles=0;
   list.forEach((it,i)=>{
+    if(q && !tokNorm(it.palabra).includes(q)) return;
+    visibles++;
     let opts=''; for(const k in TOK_GLYPHS) opts+='<option value="'+k+'" '+(it.glyph===k?'selected':'')+'>'+TOK_GLYPHS[k].label+'</option>';
-    h+='<tr><td><span class="tok tok-prev">'+tokIconHtml(it)+'</span></td>'
+    const mover=q?'<span class="hint" title="Limpia el buscador para reordenar">·</span>':'<button class="row-btn" title="Subir" '+(i===0?'disabled style="opacity:.25"':'')+' onclick="moveToken('+i+',-1)">▲</button><button class="row-btn" title="Bajar" '+(i===list.length-1?'disabled style="opacity:.25"':'')+' onclick="moveToken('+i+',1)">▼</button>';
+    h+='<tr><td style="white-space:nowrap">'+mover+'</td><td><span class="tok tok-prev">'+tokIconHtml(it)+'</span></td>'
       +'<td><input type="text" value="'+esc(it.palabra)+'" onchange="setTokWord('+i+',this.value)"></td>'
       +'<td>'+(it.img?'<span class="hint">Imagen propia · </span><button class="btn ghost mini" onclick="clearTokImg('+i+')">usar glifo</button>':'<select onchange="setTokGlyph('+i+',this.value)">'+opts+'</select>')+'</td>'
       +'<td><input type="color" value="'+esc(it.color||'#555555')+'" onchange="setTokColor('+i+',this.value)" style="width:42px;height:30px;padding:2px"'+(it.img?' disabled':'')+'></td>'
@@ -1097,9 +1102,11 @@ function renderTokens(){
       +'<td><button class="row-btn" title="Eliminar" onclick="delToken('+i+')">🗑</button></td></tr>';
   });
   tb.innerHTML=h;
-  document.getElementById('tokEmpty').style.display=list.length?'none':'';
+  document.getElementById('tokEmpty').style.display=(q?visibles:list.length)?'none':'';
+  document.getElementById('tokEmpty').textContent=q&&!visibles?'Ningún ícono coincide con la búsqueda.':'Aún no hay íconos.';
 }
-function addToken(){ tokList().push({palabra:'Nueva palabra',glyph:'estrella',color:'#6b5d4f'}); save(); renderTokens(); }
+function moveToken(i,d){ const l=tokList(); const j=i+d; if(j<0||j>=l.length)return; const [it]=l.splice(i,1); l.splice(j,0,it); save(); renderTokens(); }
+function addToken(){ tokList().push({palabra:'Nueva palabra',glyph:'estrella',color:'#6b5d4f'}); const sIn=document.getElementById('tokSearch'); if(sIn)sIn.value=''; save(); renderTokens(); }
 function seedTokens(){
   const seeds=[['Productor','hoja','#4a7c59'],['C. Primario','conejo','#b98a2f'],['C. Secundario','huella','#b05137'],['Descomponedor','hongo','#7a5aa0']];
   const l=tokList(); let n=0;
