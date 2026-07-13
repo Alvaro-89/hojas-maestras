@@ -353,7 +353,7 @@
 <div class="overlay" id="mTokens">
   <div class="modal wide">
     <h3>Íconos de texto</h3>
-    <div class="hint" style="margin-bottom:10px">Escribe una palabra entre corchetes — por ejemplo <b>[Productor]</b> — dentro de cualquier texto y las vistas mostrarán su ícono. Al copiar o exportar siempre queda la palabra escrita, nunca el ícono. El plural simple también funciona: [Productores] usa el ícono de «Productor».</div>
+    <div class="hint" style="margin-bottom:10px">Escribe una palabra entre corchetes — por ejemplo <b>[Productor]</b> — dentro de cualquier texto y las vistas mostrarán su ícono. Al copiar o exportar siempre queda la palabra escrita, nunca el ícono. Singular y plural funcionan indistintamente: [Productor] y [Productores] usan el mismo ícono.</div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span class="spacer"></span><button class="btn ghost mini" onclick="seedTokens()">Cargar propuesta (cadena trófica)</button><button class="btn primary mini" onclick="addToken()">+ Nuevo ícono</button></div>
     <table><thead><tr><th class="nosort" style="width:60px">Vista</th><th class="nosort">Palabra</th><th class="nosort" style="width:170px">Ícono</th><th class="nosort" style="width:70px">Color</th><th class="nosort" style="width:120px">Imagen propia</th><th class="nosort" style="width:50px"></th></tr></thead><tbody id="tokBody"></tbody></table>
     <div class="empty" id="tokEmpty" style="display:none">Aún no hay íconos de texto.</div>
@@ -992,8 +992,9 @@ const TOK_GLYPHS={
   moneda:{label:'Moneda',svg:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/>'}
 };
 function tokList(){ const p=proj(); if(!Array.isArray(p.textIcons))p.textIcons=[]; return p.textIcons; }
-function tokNorm(x){ return String(x).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
-function tokMatch(word,palabra){ const w=tokNorm(word),b=tokNorm(palabra); return w===b||w===b+'s'||w===b+'es'; }
+function tokNorm(x){ return String(x).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\u200B\u200C\u200D\uFEFF]/g,'').toLowerCase().trim(); }
+function tokForms(x){ const n=tokNorm(x); const f=new Set([n]); if(n.endsWith('es'))f.add(n.slice(0,-2)); if(n.endsWith('s'))f.add(n.slice(0,-1)); return f; }
+function tokMatch(word,palabra){ const a=tokForms(word),b=tokForms(palabra); for(const x of a)if(b.has(x))return true; return false; }
 function tokIconHtml(it){ if(it.img)return '<img src="'+it.img+'" alt="">'; const g=TOK_GLYPHS[it.glyph]||TOK_GLYPHS.hoja; return '<svg viewBox="0 0 24 24" fill="none" stroke="'+esc(it.color||'#555')+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">'+g.svg+'</svg>'; }
 function tokApply(str){ const list=tokList(); if(!list.length)return str; return String(str).replace(/\[([^\[\]\n]{1,60})\]/g,(m,w)=>{ const it=list.find(x=>tokMatch(w,x.palabra)); return it?'<span class="tok" title="'+esc(w)+'">'+tokIconHtml(it)+'</span>':m; }); }
 function tok(v){ return tokApply(esc(v)); }
