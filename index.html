@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Componentes de Juegos</title>
+<title>Hojas Maestras — Within Play</title>
 <style>
   :root{
     --bg:#f4f2ec; --panel:#ffffff; --ink:#2b2a26; --muted:#8a8578;
@@ -291,11 +291,12 @@
 </div>
 
 <div class="overlay" id="mBulkAdd">
-  <div class="modal">
+  <div class="modal wide">
     <h3>Agregar por lote</h3>
     <p class="hint" id="bulkHint"></p>
-    <label>Filas</label>
-    <textarea id="bulkText" rows="9"></textarea>
+    <label>Pega aquí tus datos (columnas separadas por tabulación)</label>
+    <textarea id="bulkText" rows="6" oninput="renderBulkPreview()"></textarea>
+    <div id="bulkPreviewWrap" style="margin-top:12px; max-height:250px; overflow:auto;"></div>
     <div class="modal-actions">
       <button class="btn ghost" onclick="closeModal('mBulkAdd')">Cancelar</button>
       <button class="btn primary" onclick="saveBulkAdd()">Agregar</button>
@@ -1212,13 +1213,75 @@ function duplicate(id){ const p=curType(); const c=p.components.find(x=>x.id===i
 function removeOne(id){ const c=curType().components.find(x=>x.id===id); if(!confirm('¿Eliminar "'+titleOf(c)+'"?'))return; curType().components=curType().components.filter(x=>x.id!==id); selected.delete(id); save(); render(); }
 
 /* ---------- Lote ---------- */
-function openBulkAdd(){ const simple=curType().fields.filter(f=>f.type!=='abilities'&&f.type!=='icons'); document.getElementById('bulkText').value=''; document.getElementById('bulkHint').innerHTML='Pega filas (columnas separadas por tabulación). Orden: <b>'+simple.map(f=>esc(f.label)).join(' → ')+'</b>. Solo <b>'+esc(primaryField().label)+'</b> es obligatorio. (Habilidades y ecosistemas se agregan luego en cada carta.)'; openModal('mBulkAdd'); }
+let currentBulkData = [];
+function renderBulkPreview(){
+  const text = document.getElementById('bulkText').value;
+  const wrap = document.getElementById('bulkPreviewWrap');
+  if(!text.trim()){ wrap.innerHTML=''; currentBulkData=[]; return; }
+  const lines = text.split('\n').map(l=>l.replace(/\r$/,'')).filter(l=>l.trim());
+  currentBulkData = lines.map(line => line.includes('\t')?line.split('\t'):line.split(' | '));
+  let maxCols = 0;
+  currentBulkData.forEach(cols => { if(cols.length > maxCols) maxCols = cols.length; });
+  const p = curType();
+  const simple = p.fields.filter(f=>f.type!=='abilities'&&f.type!=='icons');
+  let html = '<table style="margin-top:8px"><thead><tr>';
+  for(let i=0; i<maxCols; i++){
+    let opts = '<option value="">(Descartar columna)</option>';
+    simple.forEach((f, idx) => {
+      const sel = (i === idx) ? 'selected' : '';
+      opts += '<option value="'+f.id+'" '+sel+'>'+esc(f.label)+'</option>';
+    });
+    html += '<th><select class="bulk-col-sel" data-col="'+i+'" style="width:100%; min-width:120px; font-weight:normal;">'+opts+'</select></th>';
+  }
+  html += '</tr></thead><tbody>';
+  const previewRows = currentBulkData.slice(0, 5);
+  previewRows.forEach(cols => {
+    html += '<tr>';
+    for(let i=0; i<maxCols; i++){
+      html += '<td>'+esc(cols[i] || '')+'</td>';
+    }
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  if(currentBulkData.length > 5){
+    html += '<div class="hint" style="margin-top:6px; text-align:center">Mostrando 5 de '+currentBulkData.length+' filas...</div>';
+  }
+  wrap.innerHTML = html;
+}
+function openBulkAdd(){ 
+  document.getElementById('bulkText').value=''; 
+  document.getElementById('bulkPreviewWrap').innerHTML='';
+  document.getElementById('bulkHint').innerHTML='Pega filas (columnas separadas por tabulación). A continuación podrás asignar cada columna al campo correspondiente. Solo <b>'+esc(primaryField().label)+'</b> es obligatorio.'; 
+  currentBulkData = [];
+  openModal('mBulkAdd'); 
+}
 function saveBulkAdd(){
-  const p=curType(); const pf=primaryField(); const simple=p.fields.filter(f=>f.type!=='abilities'&&f.type!=='icons');
-  const lines=document.getElementById('bulkText').value.split('\n').map(l=>l.replace(/\r$/,'')).filter(l=>l.trim()); let added=0;
-  for(const line of lines){ const cols=line.includes('\t')?line.split('\t'):line.split(' | '); const values={};
-    simple.forEach((f,i)=>{ let raw=(cols[i]||'').trim(); if(!raw)return; if(f.type==='number')values[f.id]=+raw||0; else if(f.type==='check')values[f.id]=/^(s[ií]|x|1|true|yes)$/i.test(raw); else if(f.type==='list'||f.type==='multiselect')values[f.id]=splitList(raw); else values[f.id]=raw; });
-    if(!values[pf.id])continue; const nc={id:uid(),num:nextNum(p),values}; if(p.useCardNum)nc.cardNum=nextCardNum(p); p.components.push(nc); added++;
+  if(currentBulkData.length === 0){ toast('No hay datos para agregar'); return; }
+  const selects = document.querySelectorAll('.bulk-col-sel');
+  const colMap = {};
+  selects.forEach(sel => { if(sel.value) colMap[sel.getAttribute('data-col')] = sel.value; });
+  const p = curType(); const pf = primaryField();
+  let added = 0;
+  for(const cols of currentBulkData){ 
+    const values = {};
+    let hasPrimary = false;
+    Object.keys(colMap).forEach(colIdx => {
+      const fieldId = colMap[colIdx];
+      const raw = (cols[colIdx] || '').trim();
+      if(!raw) return;
+      const f = fieldById(fieldId);
+      if(!f) return;
+      if(f.type==='number') values[fieldId]=+raw||0; 
+      else if(f.type==='check') values[fieldId]=/^(s[ií]|x|1|true|yes)$/i.test(raw); 
+      else if(f.type==='list'||f.type==='multiselect') values[fieldId]=splitList(raw); 
+      else values[fieldId]=raw; 
+      if(fieldId === pf.id) hasPrimary = true;
+    });
+    if(!hasPrimary && !values[pf.id]) continue; 
+    const nc = {id:uid(), num:nextNum(p), values}; 
+    if(p.useCardNum) nc.cardNum=nextCardNum(p); 
+    p.components.push(nc); 
+    added++;
   }
   save(); closeModal('mBulkAdd'); render(); toast(added+' componentes agregados');
 }
