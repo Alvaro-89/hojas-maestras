@@ -109,6 +109,10 @@
   .card-acts .row-btn:hover{opacity:1;}
   .card-field{font-size:12.5px; margin-bottom:7px; line-height:1.45; white-space:pre-wrap;}
   .card-field .lbl{display:block; font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); font-weight:600; margin-bottom:1px;}
+  td.miss{background:rgba(220,53,69,.10); box-shadow:inset 3px 0 0 #dc3545;}
+  td.miss::after{content:"Falta"; font-size:10.5px; font-weight:700; color:#b02a37; letter-spacing:.3px;}
+  .card-field.miss{background:rgba(220,53,69,.09); border-left:3px solid #dc3545; padding:3px 6px; border-radius:4px;}
+  .card-field .val-miss{color:#b02a37; font-weight:700; font-size:11.5px;}
   .card-num{color:var(--muted); font-weight:700; font-size:12.5px;}
   .usecount{font-size:11px; color:var(--muted);}
   .yes{color:var(--green); font-weight:700;} .no{color:var(--muted);}
@@ -248,6 +252,7 @@
             <th class="nosort">Opciones / configuración</th>
             <th class="nosort" style="width:90px">En resumen</th>
             <th class="nosort" style="width:90px">En tarjeta</th>
+            <th class="nosort" style="width:95px">Alerta si vacío</th>
             <th class="nosort" style="width:70px">Título</th>
             <th class="nosort" style="width:50px"></th>
           </tr></thead>
@@ -748,7 +753,7 @@ function cardHtml(c,p,rcField){
   const title=tf?(valOf(c,tf)||'(sin título)'):'(sin título)';
   let h='<div class="card-c"'+st+' ondblclick="openEdit(\''+c.id+'\')">';
   h+='<div class="card-head"><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onclick="event.stopPropagation()" ondblclick="event.stopPropagation()" onchange="toggleSel(\''+c.id+'\',this)"><span class="card-title"><span class="card-num">ID '+(c.num??'')+'</span> '+tok(title)+(p.useCardNum&&c.cardNum!=null?' <span class="icon-tag" title="N° de carta">Carta '+c.cardNum+'</span>':'')+'</span><span class="card-acts" ondblclick="event.stopPropagation()"><button class="row-btn" title="Copiar resumen" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button><button class="row-btn" title="Editar" onclick="event.stopPropagation();openEdit(\''+c.id+'\')">✎</button><button class="row-btn" title="Duplicar" onclick="event.stopPropagation();duplicate(\''+c.id+'\')">⧉</button><button class="row-btn" title="Eliminar" onclick="event.stopPropagation();removeOne(\''+c.id+'\')">🗑</button></span></div>';
-  p.fields.forEach(f=>{ if(f===tf||f.inCard===false)return; const vh=cardValHtml(c,f); if(vh===''||vh==null)return; h+='<div class="card-field"><span class="lbl">'+esc(f.label)+'</span>'+vh+'</div>'; });
+  p.fields.forEach(f=>{ if(f===tf||f.inCard===false)return; const miss=missAlert(c,f); const vh=miss?'<span class="val-miss">Falta completar</span>':cardValHtml(c,f); if(!miss&&(vh===''||vh==null))return; h+='<div class="card-field'+(miss?' miss':'')+'"><span class="lbl">'+esc(f.label)+'</span>'+vh+'</div>'; });
   return h+'</div>';
 }
 function colDefault(key){ if(key==='sel')return 34; if(key==='num')return 56; if(key==='cardnum')return 80; if(key==='acc')return 90; if(key==='resumen')return 320; const f=fieldById(key); if(!f)return 150; return ({number:70,check:60,select:140,long:240,abilities:240,icons:150,multiselect:170,list:150})[f.type]||150; }
@@ -789,7 +794,10 @@ document.addEventListener('dblclick',e=>{
   const m=String(h.getAttribute('onmousedown')||'').match(/startResize\(event,'([^']+)'\)/);
   if(m)autoFit(m[1]);
 });
-function cellHtml(c,f){
+function isBlank(v){ return v===''||v===null||v===undefined||(Array.isArray(v)&&v.length===0); }
+function missAlert(c,f){ if(f.alertEmpty===false)return false; if(f.type==='check')return false; return isBlank(valOf(c,f)); }
+function cellHtml(c,f){ const h=cellHtmlBase(c,f); return missAlert(c,f)? h.replace('<td class="','<td class="miss ') : h; }
+function cellHtmlBase(c,f){
   const v=valOf(c,f);
   const dcEdit=' ondblclick="editCell(this,\''+c.id+'\',\''+f.id+'\')"';
   const dcOpen=' ondblclick="openEdit(\''+c.id+'\')"';
@@ -920,6 +928,7 @@ function renderFields(){
       '<td>'+cfg+'</td>'+
       '<td style="text-align:center"><input type="checkbox" '+(f.inSummary!==false?'checked':'')+' onchange="toggleInSummary(\''+f.id+'\',this.checked)"></td>'+
       '<td style="text-align:center"><input type="checkbox" '+(f.inCard!==false?'checked':'')+' onchange="toggleInCard(\''+f.id+'\',this.checked)"></td>'+
+      '<td style="text-align:center"><input type="checkbox" '+(f.alertEmpty!==false?'checked':'')+(f.type==='check'?' disabled title="Los campos Sí/No nunca quedan vacíos"':'')+' onchange="toggleAlertEmpty(\''+f.id+'\',this.checked)"></td>'+
       '<td style="text-align:center"><input type="radio" name="primaryField" '+(f.primary?'checked':'')+' onchange="setPrimary(\''+f.id+'\')"></td>'+
       '<td style="white-space:nowrap"><button class="row-btn" title="Duplicar campo" onclick="duplicateField(\''+f.id+'\')">⧉</button><button class="row-btn" onclick="deleteField(\''+f.id+'\')">🗑</button></td></tr>';
   }).join('');
@@ -943,6 +952,7 @@ function updateField(id,field,val){
 }
 function toggleInSummary(id,on){ const f=fieldById(id); if(!f)return; if(on)delete f.inSummary; else f.inSummary=false; save(); }
 function toggleInCard(id,on){ const f=fieldById(id); if(!f)return; if(on)delete f.inCard; else f.inCard=false; save(); }
+function toggleAlertEmpty(id,on){ const f=fieldById(id); if(!f)return; if(on)delete f.alertEmpty; else f.alertEmpty=false; save(); render(); }
 function toggleItalic(id,on){ const f=fieldById(id); if(!f)return; if(on)f.italic=true; else delete f.italic; save(); render(); }
 function setPrimary(id){ curType().fields.forEach(f=>f.primary=(f.id===id)); save(); toast('Campo título actualizado'); }
 function moveField(i,dir){ const a=curType().fields, j=i+dir; if(j<0||j>=a.length)return; const t=a[i]; a[i]=a[j]; a[j]=t; save(); renderFields(); }
