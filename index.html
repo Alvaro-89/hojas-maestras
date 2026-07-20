@@ -573,6 +573,10 @@ function parseAbilityString(raw){
   return {tipo,nombre,texto};
 }
 function abilityLabel(a){ return a.nombre+(a.texto? ': '+a.texto:''); }
+const ABIL_RANK={Activa:0,Pasiva:1};
+function abilSorted(f,v){ const ids=Array.isArray(v)?v:[]; const lib=f.library||[];
+  return ids.map((id,i)=>({id,i,r:(()=>{const a=lib.find(x=>x.id===id); return a?(ABIL_RANK[a.tipo]!==undefined?ABIL_RANK[a.tipo]:2):3;})()}))
+    .sort((a,b)=>a.r-b.r||a.i-b.i).map(o=>o.id); }
 function abilityFull(a){ return (a.tipo&&a.tipo!=='General'? a.tipo+' — ':'')+abilityLabel(a); }
 function findOrCreateAbilityInField(f, tipo, nombre, texto){
   nombre=(nombre||'').trim(); texto=(texto||'').trim(); if(!nombre&&!texto) return null;
@@ -640,7 +644,7 @@ function resetFilters(){ filterState={}; sortKey=null; }
 /* ---------- Filtro / orden ---------- */
 function cellText(c,f){ const v=valOf(c,f);
   if(f.type==='check')return v?'sí':'no';
-  if(f.type==='abilities')return (v||[]).map(id=>{const a=(f.library||[]).find(x=>x.id===id);return a?abilityLabel(a):'';}).join(' ');
+  if(f.type==='abilities')return abilSorted(f,v).map(id=>{const a=(f.library||[]).find(x=>x.id===id);return a?abilityLabel(a):'';}).join(' ');
   if(f.type==='icons')return (v||[]).map(x=>x.tipo).join(' ');
   if(Array.isArray(v))return v.join(' ');
   return String(v??''); }
@@ -742,7 +746,7 @@ function renderComponents(){
 function setCompView(m){ curType().viewMode=m; save(); render(); }
 function cardValHtml(c,f){
   const v=valOf(c,f);
-  if(f.type==='abilities') return (v||[]).map(id=>{const a=(f.library||[]).find(x=>x.id===id); if(!a)return''; const cls=a.tipo==='Activa'?'act':a.tipo==='Pasiva'?'pas':''; return '<span class="chip '+cls+'"'+chipStyle(f,a.tipo)+' title="'+esc(abilityFull(a))+'">'+tok(a.nombre||a.texto)+'</span>';}).join('');
+  if(f.type==='abilities') return abilSorted(f,v).map(id=>{const a=(f.library||[]).find(x=>x.id===id); if(!a)return''; const cls=a.tipo==='Activa'?'act':a.tipo==='Pasiva'?'pas':''; return '<span class="chip '+cls+'"'+chipStyle(f,a.tipo)+' title="'+esc(abilityFull(a))+'">'+tok(a.nombre||a.texto)+'</span>';}).join('');
   if(f.type==='icons') return (v||[]).map(x=>'<span class="icon-tag">'+esc(x.tipo)+' ×'+x.cantidad+'</span>').join('');
   if(f.type==='check') return v?'<span class="yes">✓</span>':'<span class="no">—</span>';
   if(f.type==='multiselect') return (Array.isArray(v)?v:[]).map(x=>{const col=(f.colors||{})[x]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; return '<span class="tag"'+st+'>'+tok(x)+'</span>';}).join('');
@@ -805,7 +809,7 @@ function cellHtmlBase(c,f){
   const v=valOf(c,f);
   const dcEdit=' ondblclick="editCell(this,\''+c.id+'\',\''+f.id+'\')"';
   const dcOpen=' ondblclick="openEdit(\''+c.id+'\')"';
-  if(f.type==='abilities'){ const chips=(v||[]).map(id=>{const a=(f.library||[]).find(x=>x.id===id); if(!a)return''; const cls=a.tipo==='Activa'?'act':a.tipo==='Pasiva'?'pas':''; return '<span class="chip '+cls+'"'+chipStyle(f,a.tipo)+' title="'+esc(abilityFull(a))+'">'+tok(a.nombre||a.texto)+'</span>';}).join(''); return '<td class="cell-hab ec"'+dcOpen+'>'+chips+'</td>'; }
+  if(f.type==='abilities'){ const chips=abilSorted(f,v).map(id=>{const a=(f.library||[]).find(x=>x.id===id); if(!a)return''; const cls=a.tipo==='Activa'?'act':a.tipo==='Pasiva'?'pas':''; return '<span class="chip '+cls+'"'+chipStyle(f,a.tipo)+' title="'+esc(abilityFull(a))+'">'+tok(a.nombre||a.texto)+'</span>';}).join(''); return '<td class="cell-hab ec"'+dcOpen+'>'+chips+'</td>'; }
   if(f.type==='icons'){ const t=(v||[]).map(x=>'<span class="icon-tag">'+esc(x.tipo)+' ×'+x.cantidad+'</span>').join(''); return '<td class="cell-icon ec"'+dcOpen+'>'+t+'</td>'; }
   if(f.type==='check') return '<td class="ec"'+dcEdit+'>'+(v?'<span class="yes">✓</span>':'<span class="no">—</span>')+'</td>';
   if(f.type==='long'){ const shown=tok(String(v).length>140?String(v).slice(0,140)+'…':v); return '<td class="long ec"'+dcEdit+' title="'+esc(v)+'">'+(f.italic?'<i>'+shown+'</i>':shown)+'</td>'; }
@@ -1344,18 +1348,18 @@ function bulkDelete(){ if(!confirm('¿Eliminar los '+selected.size+' seleccionad
 /* ---------- Exportar ---------- */
 function fieldOut(c,f){ const v=valOf(c,f);
   if(f.type==='check')return v?'Sí':'No';
-  if(f.type==='abilities')return (v||[]).map(id=>{const a=(f.library||[]).find(x=>x.id===id);return a?abilityFull(a):'';}).filter(Boolean).join(' | ');
+  if(f.type==='abilities')return abilSorted(f,v).map(id=>{const a=(f.library||[]).find(x=>x.id===id);return a?abilityFull(a):'';}).filter(Boolean).join(' | ');
   if(f.type==='icons')return (v||[]).map(x=>x.tipo+' ×'+x.cantidad).join(', ');
   if(Array.isArray(v))return v.join(', ');
   return String(v??''); }
 let exportScope='type';
 function openExport(scope){ exportScope=scope||'type'; buildExport(); openModal('mExport'); }
 function setExportFmt(el){ document.querySelectorAll('#mExport .tab').forEach(t=>t.classList.remove('active')); el.classList.add('active'); exportFmt=el.dataset.fmt; buildExport(); }
-function compJson(t,c){ const o={}; t.fields.forEach(f=>{ if(f.type==='abilities')o[f.label]=(valOf(c,f)||[]).map(id=>{const a=(f.library||[]).find(x=>x.id===id);return a?{tipo:a.tipo,nombre:a.nombre,texto:a.texto}:null;}).filter(Boolean); else o[f.label]=valOf(c,f); }); return o; }
+function compJson(t,c){ const o={}; t.fields.forEach(f=>{ if(f.type==='abilities')o[f.label]=abilSorted(f,valOf(c,f)).map(id=>{const a=(f.library||[]).find(x=>x.id===id);return a?{tipo:a.tipo,nombre:a.nombre,texto:a.texto}:null;}).filter(Boolean); else o[f.label]=valOf(c,f); }); return o; }
 function exportBlock(t, list, fmt){
   let out='';
-  if(fmt==='texto'){ for(const c of list){ out+='\n• '+titleOf2(t,c)+'\n'; for(const f of t.fields){ if(f.primary)continue; if(f.type==='abilities'){ (valOf(c,f)||[]).forEach(id=>{const a=(f.library||[]).find(x=>x.id===id); if(a)out+='  '+abilityFull(a)+'\n';}); continue; } const val=fieldOut(c,f); if(val)out+='  '+f.label+': '+val.replace(/\n/g,' ')+'\n'; } } }
-  else if(fmt==='md'){ for(const c of list){ out+='### '+titleOf2(t,c)+'\n\n'; for(const f of t.fields){ if(f.primary)continue; if(f.type==='abilities'){ const arr=valOf(c,f)||[]; if(arr.length){ out+='**'+f.label+':**\n'; arr.forEach(id=>{const a=(f.library||[]).find(x=>x.id===id); if(a)out+='- '+abilityFull(a)+'\n';}); out+='\n'; } continue; } const val=fieldOut(c,f); if(val)out+='- **'+f.label+':** '+val.replace(/\n/g,' ')+'\n'; } out+='\n'; } }
+  if(fmt==='texto'){ for(const c of list){ out+='\n• '+titleOf2(t,c)+'\n'; for(const f of t.fields){ if(f.primary)continue; if(f.type==='abilities'){ abilSorted(f,valOf(c,f)).forEach(id=>{const a=(f.library||[]).find(x=>x.id===id); if(a)out+='  '+abilityFull(a)+'\n';}); continue; } const val=fieldOut(c,f); if(val)out+='  '+f.label+': '+val.replace(/\n/g,' ')+'\n'; } } }
+  else if(fmt==='md'){ for(const c of list){ out+='### '+titleOf2(t,c)+'\n\n'; for(const f of t.fields){ if(f.primary)continue; if(f.type==='abilities'){ const arr=abilSorted(f,valOf(c,f)); if(arr.length){ out+='**'+f.label+':**\n'; arr.forEach(id=>{const a=(f.library||[]).find(x=>x.id===id); if(a)out+='- '+abilityFull(a)+'\n';}); out+='\n'; } continue; } const val=fieldOut(c,f); if(val)out+='- **'+f.label+':** '+val.replace(/\n/g,' ')+'\n'; } out+='\n'; } }
   else if(fmt==='csv'){ const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"'; out=t.fields.map(f=>q(f.label)).join(',')+'\n'+list.map(c=>t.fields.map(f=>q(fieldOut(c,f))).join(',')).join('\n'); }
   return out;
 }
