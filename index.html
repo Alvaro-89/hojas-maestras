@@ -125,7 +125,8 @@
   .card-field.chg{background:#fff1dc; border-left:3px solid #e8892b; padding:3px 6px; border-radius:4px;}
   .chg-ok{float:right; margin-left:6px; border:1px solid #e8892b; background:#fff; color:#b35c0f; border-radius:6px; font-size:11px; font-weight:700; padding:1px 6px; cursor:pointer; line-height:16px;}
   .chg-ok:hover{background:#e8892b; color:#fff;}
-  .pend{font-size:11px; font-weight:700; color:#fff; background:#e8892b; border-radius:10px; padding:0 7px; margin-left:4px;}
+  .pend{display:inline-block; white-space:nowrap; font-size:11px; font-weight:700; line-height:17px; color:#fff; background:#e8892b; border-radius:10px; padding:0 8px; margin-left:4px;}
+  .tile-pend{margin-top:8px;} .tile-pend .pend{margin-left:0;}
   #chgBtn.has{border-color:#e8892b; color:#b35c0f; font-weight:700;}
   .chg-table{width:100%; border-collapse:collapse;} .chg-table th{font-size:12px; text-align:left; color:var(--muted); padding:6px; border-bottom:1px solid var(--line);}
   .chg-table td{vertical-align:top; font-size:12.5px; padding:6px; border-bottom:1px solid var(--line);} .chg-table .old{color:#8a8578; text-decoration:line-through;}
@@ -804,7 +805,7 @@ function renderNav(){
 }
 function renderTypes(){
   const p=proj();
-  document.getElementById('typeTiles').innerHTML=p.types.map(t=>'<div class="tile" onclick="openType(\''+t.id+'\')"><button class="tile-dup" title="Duplicar tipo" onclick="event.stopPropagation();dupType(\''+t.id+'\')">⧉</button><div class="tile-name">'+esc(t.name)+'</div><div class="tile-meta">'+t.components.length+' componentes · '+t.fields.length+' campos'+(chgCount(p,t.id)?' <span class="pend">'+chgCount(p,t.id)+' pendientes</span>':'')+'</div></div>').join('')+'<div class="tile tile-add" onclick="addType()"><div class="tile-plus">+</div><div>Nuevo tipo de componente</div></div>';
+  document.getElementById('typeTiles').innerHTML=p.types.map(t=>'<div class="tile" onclick="openType(\''+t.id+'\')"><button class="tile-dup" title="Duplicar tipo" onclick="event.stopPropagation();dupType(\''+t.id+'\')">⧉</button><div class="tile-name">'+esc(t.name)+'</div><div class="tile-meta">'+t.components.length+' componentes · '+t.fields.length+' campos</div>'+(chgCount(p,t.id)?'<div class="tile-pend"><span class="pend">'+chgCount(p,t.id)+' pendiente'+(chgCount(p,t.id)===1?'':'s')+'</span></div>':'')+'</div>').join('')+'<div class="tile tile-add" onclick="addType()"><div class="tile-plus">+</div><div>Nuevo tipo de componente</div></div>';
 }
 function openType(id){ proj().activeTypeId=id; typeOpened=true; currentView='componentes'; selected.clear(); resetFilters(); const s=document.getElementById('search'); if(s)s.value=''; save(); render(); }
 function backToTypes(){ typeOpened=false; selected.clear(); render(); }
