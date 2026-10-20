@@ -116,6 +116,15 @@
   td.miss{background:rgba(220,53,69,.10); box-shadow:inset 3px 0 0 #dc3545;}
   td.miss::after{content:"Falta"; font-size:10.5px; font-weight:700; color:#b02a37; letter-spacing:.3px;}
   .card-field.miss{background:rgba(220,53,69,.09); border-left:3px solid #dc3545; padding:3px 6px; border-radius:4px;}
+  td.chg{background:#fff1dc; box-shadow:inset 3px 0 0 #e8892b;}
+  .card-field.chg{background:#fff1dc; border-left:3px solid #e8892b; padding:3px 6px; border-radius:4px;}
+  .chg-ok{float:right; margin-left:6px; border:1px solid #e8892b; background:#fff; color:#b35c0f; border-radius:6px; font-size:11px; font-weight:700; padding:1px 6px; cursor:pointer; line-height:16px;}
+  .chg-ok:hover{background:#e8892b; color:#fff;}
+  .pend{font-size:11px; font-weight:700; color:#fff; background:#e8892b; border-radius:10px; padding:0 7px; margin-left:4px;}
+  #chgBtn.has{border-color:#e8892b; color:#b35c0f; font-weight:700;}
+  .chg-table{width:100%; border-collapse:collapse;} .chg-table th{font-size:12px; text-align:left; color:var(--muted); padding:6px; border-bottom:1px solid var(--line);}
+  .chg-table td{vertical-align:top; font-size:12.5px; padding:6px; border-bottom:1px solid var(--line);} .chg-table .old{color:#8a8578; text-decoration:line-through;}
+  .chg-only{font-size:13px;color:var(--muted);display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;}
   .card-field .val-miss{color:#b02a37; font-weight:700; font-size:11.5px;}
   .card-num{color:var(--muted); font-weight:700; font-size:12.5px;}
   .usecount{font-size:11px; color:var(--muted);}
@@ -212,6 +221,7 @@
         <h2 id="projTitle" title="Clic para renombrar" onclick="renameProject()"></h2>
         <span class="stats" id="stats"></span>
         <span class="spacer"></span>
+        <button class="btn ghost" id="chgBtn" onclick="openChanges()" title="Cambios pendientes de implementar en las cartas reales">Cambios</button>
         <button class="btn ghost" id="undoBtn" onclick="undoChange()" disabled title="Deshacer último cambio (Ctrl+Z)">↩ Deshacer</button>
         <button class="btn ghost" id="redoBtn" onclick="redoChange()" disabled title="Rehacer (Ctrl+Y)">↪ Rehacer</button>
         <button class="btn ghost" style="color:#a33" onclick="deleteProject()">Eliminar juego</button>
@@ -229,6 +239,7 @@
         <input type="text" id="search" placeholder="Buscar…" oninput="render()">
         <span id="dynFilters"></span>
         <span id="sortBox"></span>
+        <label class="chg-only" title="Mostrar solo los componentes con cambios sin implementar"><input type="checkbox" id="chkPendOnly" style="width:auto" onchange="pendOnly=this.checked;render()"> Solo pendientes</label>
         <span class="spacer"></span>
         <span class="vswitch"><button id="vmLista" title="Ver como lista" onclick="setCompView('lista')">☰ Lista</button><button id="vmTarjetas" title="Ver como tarjetas" onclick="setCompView('tarjetas')">▦ Tarjetas</button></span>
         <button class="btn" id="bulkEditBtn" onclick="openBulkEdit()" disabled>Editar selección</button>
@@ -257,6 +268,7 @@
             <th class="nosort" style="width:90px">En resumen</th>
             <th class="nosort" style="width:90px">En tarjeta</th>
             <th class="nosort" style="width:95px">Alerta si vacío</th>
+            <th class="nosort" style="width:95px" title="Si cambia este campo, se marca como pendiente de implementar en la carta real">Control de cambios</th>
             <th class="nosort" style="width:70px">Título</th>
             <th class="nosort" style="width:50px"></th>
           </tr></thead>
@@ -421,6 +433,15 @@
     </div>
   </div>
 </div>
+<div class="overlay" id="mChanges">
+  <div class="modal" style="width:980px">
+    <h3>Control de cambios · <span id="mChgProj"></span></h3>
+    <label style="display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--ink);font-weight:normal;margin:0"><input type="checkbox" id="chkTrack" style="width:auto" onchange="toggleTrack(this.checked)"> Registrar los cambios de este juego (los campos que cambien quedan marcados hasta que alguien los marque como implementados)</label>
+    <div style="margin:12px 0;display:flex;gap:8px"><button class="viewtab" id="chgTabP" onclick="chgTab='p';renderChanges()">Pendientes</button><button class="viewtab" id="chgTabA" onclick="chgTab='a';renderChanges()">Historial</button></div>
+    <div id="chgList"></div>
+    <div class="modal-actions"><button class="btn ghost" onclick="closeModal('mChanges')">Cerrar</button></div>
+  </div>
+</div>
 <div class="overlay" id="mPrompt">
   <div class="modal" style="width:440px">
     <h3 id="mPromptTitle">Nombre</h3>
@@ -452,7 +473,7 @@ firebase.initializeApp(firebaseConfig);
 const fbAuth=firebase.auth();
 const fbDoc=firebase.firestore().collection('workspaces').doc('principal');
 const CLIENT_ID=Math.random().toString(36).slice(2);
-let cloudReady=false, saveTimer=null, fbUnsub=null;
+let cloudReady=false, saveTimer=null, fbUnsub=null, lastLocalEdit=0;
 
 function doLogin(){
   const email=document.getElementById('loginEmail').value.trim();
@@ -488,6 +509,9 @@ function startSync(){
       if(!s.exists||s.metadata.hasPendingWrites)return;
       const d=s.data();
       if(d.client===CLIENT_ID)return;
+      // Si acabas de hacer un cambio local (ej. borrar un campo), no dejes que un
+      // dato viejo llegado de la nube lo pise: reafirma tu versión y no apliques el remoto.
+      if(Date.now()-lastLocalEdit < 5000){ flushCloud(); return; }
       applyCloud(d);
       toast('Datos actualizados por '+(d.updatedBy||'el equipo'));
     });
@@ -515,6 +539,9 @@ function pushCloud(){
     updatedAt:firebase.firestore.FieldValue.serverTimestamp()
   }).catch(()=>toast('No se pudo guardar en la nube — revisa tu conexión'));
 }
+// Sube el cambio a la nube de inmediato (sin esperar los 600 ms), para cambios
+// estructurales como borrar/duplicar campos, así no se pierden ni "reaparecen".
+function flushCloud(){ if(cloudReady){ clearTimeout(saveTimer); pushCloud(); } }
 
 let state=load();
 /* ---------- Deshacer / Rehacer ---------- */
@@ -622,7 +649,7 @@ function migrateProject(p){
   return p;
 }
 function load(){ try{ const raw=localStorage.getItem(KEY); if(raw){ const s=JSON.parse(raw); if(s.projects&&s.projects.length){ s.projects.forEach(migrateProject); return s; } } }catch(e){} const p=newProject('Mi primer juego'); return {projects:[p], activeId:p.id}; }
-function save(){ histRecord(); localStorage.setItem(KEY, JSON.stringify(state)); if(cloudReady){ clearTimeout(saveTimer); saveTimer=setTimeout(pushCloud,600); } }
+function save(){ chgTrack(lastSaved); histRecord(); lastLocalEdit=Date.now(); localStorage.setItem(KEY, JSON.stringify(state)); if(cloudReady){ clearTimeout(saveTimer); saveTimer=setTimeout(pushCloud,600); } }
 function proj(){ return state.projects.find(p=>p.id===state.activeId)||state.projects[0]; }
 function curType(){ const p=proj(); return p.types.find(t=>t.id===p.activeTypeId)||p.types[0]; }
 function fieldById(id){ return curType().fields.find(f=>f.id===id); }
@@ -630,6 +657,85 @@ function primaryField(){ const p=curType(); return p.fields.find(f=>f.primary)||
 function valOf(c,f){ const v=c.values[f.id]; if(v!==undefined)return v; if(f.type==='check')return false; if(f.type==='list'||f.type==='multiselect'||f.type==='abilities'||f.type==='icons')return []; return ''; }
 function titleOf(c){ const pf=primaryField(); const v=pf?c.values[pf.id]:''; return (v===''||v===undefined||v===null)?'(sin título)':v; }
 function splitList(s){ return String(s).split(',').map(x=>x.trim()).filter(Boolean); }
+
+/* ---------- Control de cambios ---------- */
+// Cada juego puede registrar sus cambios (p.trackChanges). Los cambios viven en p.changeLog:
+// {id,typeId,typeName,cardId,card,cardNum,fieldId,field,prev,next,by,at,kind,done,doneBy,doneAt}
+let pendOnly=false, chgTab='p', _pm=null;
+const CHG_MAX=800;
+function chgUser(){ return (fbAuth.currentUser&&fbAuth.currentUser.email)||''; }
+function chgLog(p){ if(!p)return []; if(!Array.isArray(p.changeLog))p.changeLog=[]; return p.changeLog; }
+function chgCount(p,typeId){ return chgLog(p).filter(e=>!e.done&&(!typeId||e.typeId===typeId)).length; }
+function chgDisp(f,c){ const v=c&&c.values?c.values[f.id]:undefined;
+  if(f.type==='check') return v?'sí':'no';
+  if(v===undefined||v===null) return '';
+  if(f.type==='abilities') return abilSorted(f,v).map(id=>{const a=(f.library||[]).find(x=>x.id===id); return a?abilityFull(a):'';}).filter(Boolean).join(' · ');
+  if(f.type==='icons') return (Array.isArray(v)?v:[]).map(x=>x.tipo+' ×'+x.cantidad).join(', ');
+  if(Array.isArray(v)) return v.join(', ');
+  return String(v); }
+function chgTitle(t,c){ const pf=(t.fields||[]).find(f=>f.primary)||(t.fields||[])[0]; const v=pf&&c&&c.values?c.values[pf.id]:''; return (v===''||v==null)?'(sin título)':String(v); }
+function chgTrack(prevStr){
+  if(!state.projects.some(p=>p.trackChanges))return;
+  let prev; try{ prev=JSON.parse(prevStr); }catch(e){ return; }
+  if(!prev||!Array.isArray(prev.projects))return;
+  const now=new Date().toISOString(), by=chgUser();
+  state.projects.forEach(p=>{
+    if(!p.trackChanges)return;
+    const pp=prev.projects.find(x=>x.id===p.id); if(!pp||!pp.trackChanges)return;
+    const log=chgLog(p);
+    p.types.forEach(t=>{
+      const pt=(pp.types||[]).find(x=>x.id===t.id); if(!pt)return;
+      const prevC={}; (pt.components||[]).forEach(c=>prevC[c.id]=c);
+      t.components.forEach(c=>{
+        const pc=prevC[c.id];
+        t.fields.forEach(f=>{
+          if(f.noTrack)return;
+          const pf=(pt.fields||[]).find(x=>x.id===f.id);
+          if(pc&&!pf)return; // campo recién creado: no se marca
+          const before=pc?chgDisp(pf,pc):'';
+          const after=chgDisp(f,c);
+          if(before===after)return;
+          if(!pc&&(after===''||(f.type==='check'&&!c.values[f.id])))return;
+          let e=log.find(x=>!x.done&&x.cardId===c.id&&x.fieldId===f.id);
+          if(!e){ e={id:uid(),typeId:t.id,cardId:c.id,fieldId:f.id,prev:before,kind:pc?'cambio':'nueva',done:false}; log.push(e); }
+          Object.assign(e,{typeName:t.name,card:chgTitle(t,c),cardNum:(c.cardNum!=null?c.cardNum:null),field:f.label,next:after,by:by,at:now});
+          if(e.prev===after) log.splice(log.indexOf(e),1);
+        });
+      });
+      const ids=new Set(t.components.map(c=>c.id));
+      (pt.components||[]).forEach(pc=>{
+        if(ids.has(pc.id))return;
+        const open=log.filter(x=>!x.done&&x.cardId===pc.id);
+        const wasNew=open.some(x=>x.kind==='nueva');
+        open.forEach(x=>log.splice(log.indexOf(x),1));
+        if(!wasNew) log.push({id:uid(),typeId:t.id,typeName:t.name,cardId:pc.id,fieldId:null,card:chgTitle(pt,pc),cardNum:(pc.cardNum!=null?pc.cardNum:null),field:'(carta completa)',prev:'',next:'Carta eliminada',by:by,at:now,kind:'eliminada',done:false});
+      });
+    });
+    if(log.length>CHG_MAX){ const open=log.filter(x=>!x.done), closed=log.filter(x=>x.done); p.changeLog=open.concat(closed.slice(-Math.max(0,CHG_MAX-open.length))); }
+  });
+}
+function chgPendMap(){ const m={}; chgLog(proj()).forEach(e=>{ if(!e.done&&e.fieldId)m[e.cardId+'|'+e.fieldId]=e; }); return m; }
+function chgDate(iso){ try{ return new Date(iso).toLocaleString('es-CL',{dateStyle:'short',timeStyle:'short'}); }catch(e){ return iso||''; } }
+function chgTip(e){ return (e.kind==='nueva'?'Componente nuevo':'Antes: '+(e.prev===''?'(vacío)':e.prev))+'\nCambiado por '+(e.by||'—')+' el '+chgDate(e.at)+'\nClic para marcar como implementado en la carta real'; }
+function chgBtnHtml(cid,fid,e){ return '<button class="chg-ok" title="'+esc(chgTip(e))+'" onclick="event.stopPropagation();chgDone(\''+cid+'\',\''+fid+'\')" ondblclick="event.stopPropagation()">✓</button>'; }
+function chgMark(e){ e.done=true; e.doneBy=chgUser(); e.doneAt=new Date().toISOString(); }
+function chgDone(cid,fid){ chgLog(proj()).forEach(e=>{ if(!e.done&&e.cardId===cid&&e.fieldId===fid)chgMark(e); }); save(); render(); if(document.getElementById('mChanges').classList.contains('open'))renderChanges(); toast('Marcado como implementado'); }
+function chgDoneId(id){ const e=chgLog(proj()).find(x=>x.id===id); if(!e||e.done)return; chgMark(e); save(); render(); renderChanges(); toast('Marcado como implementado'); }
+function toggleTrack(on){ const p=proj(); if(on)p.trackChanges=true; else delete p.trackChanges; save(); render(); renderChanges(); toast(on?'Control de cambios activado: desde ahora se marcan los cambios':'Control de cambios desactivado'); }
+function toggleTrackField(id,on){ const f=fieldById(id); if(!f)return; if(on)delete f.noTrack; else f.noTrack=true; save(); }
+function openChanges(){ chgTab=chgCount(proj())?'p':'a'; renderChanges(); openModal('mChanges'); }
+function renderChanges(){
+  const p=proj();
+  document.getElementById('mChgProj').textContent=p.name;
+  document.getElementById('chkTrack').checked=!!p.trackChanges;
+  document.getElementById('chgTabP').classList.toggle('active',chgTab==='p');
+  document.getElementById('chgTabA').classList.toggle('active',chgTab==='a');
+  document.getElementById('chgTabP').textContent='Pendientes ('+chgCount(p)+')';
+  const rows=chgLog(p).filter(e=>chgTab==='a'||!e.done).slice().sort((a,b)=>String(b.at).localeCompare(String(a.at)));
+  const box=document.getElementById('chgList');
+  if(!rows.length){ box.innerHTML='<div class="empty">'+(chgTab==='p'?'No hay cambios pendientes.':'Todavía no hay cambios registrados.')+(p.trackChanges?'':'<br>El control de cambios está desactivado para este juego.')+'</div>'; return; }
+  box.innerHTML='<table class="chg-table"><thead><tr><th>Tipo</th><th>N°</th><th>Carta</th><th>Campo</th><th>Antes</th><th>Ahora</th><th>Cambio</th><th></th></tr></thead><tbody>'+rows.map(e=>'<tr><td>'+esc(e.typeName||'')+'</td><td>'+(e.cardNum!=null?esc(e.cardNum):'')+'</td><td><b>'+tok(e.card||'')+'</b></td><td>'+esc(e.field||'')+'</td><td class="old">'+tok(e.prev||'')+'</td><td>'+tok(e.next||'')+'</td><td style="white-space:nowrap">'+esc(e.by||'—')+'<br><span style="color:var(--muted)">'+chgDate(e.at)+'</span></td><td style="white-space:nowrap">'+(e.done?'<span style="color:var(--green);font-weight:600">✓ Implementado</span><br><span style="color:var(--muted)">'+esc(e.doneBy||'—')+' · '+chgDate(e.doneAt)+'</span>':'<button class="btn mini" onclick="chgDoneId(\''+e.id+'\')">✓ Implementado</button>')+'</td></tr>').join('')+'</tbody></table>';
+}
 
 /* ---------- Vistas ---------- */
 function setView(v){ currentView=v; render(); }
@@ -650,7 +756,9 @@ function cellText(c,f){ const v=valOf(c,f);
   return String(v??''); }
 function visibleComponents(){
   const q=document.getElementById('search').value.trim().toLowerCase(); const p=curType();
+  const pendSet=pendOnly?new Set(chgLog(proj()).filter(e=>!e.done).map(e=>e.cardId)):null;
   let list=p.components.filter(c=>{
+    if(pendSet&&!pendSet.has(c.id))return false;
     for(const k in filterState){ const f=fieldById(k); const fv=filterState[k]; if(!f||!fv)continue; const v=valOf(c,f);
       if(f.type==='multiselect'||f.type==='list'||f.type==='abilities'){ if(!(Array.isArray(v)&&v.includes(fv)))return false; }
       else if(f.type==='icons'){ if(!(Array.isArray(v)&&v.some(x=>x.tipo===fv)))return false; }
@@ -672,8 +780,9 @@ function clearFiltros(){ filterState={}; sortKey=null; sortDir=1; const s=docume
 /* ---------- Render ---------- */
 function render(){
   const p=proj();
-  document.getElementById('projectList').innerHTML=state.projects.map(x=>'<div class="proj '+(x.id===p.id?'active':'')+'" onclick="switchProject(\''+x.id+'\')"><span>'+esc(x.name)+'</span><span class="count">'+x.types.reduce((s,t)=>s+t.components.length,0)+'</span></div>').join('');
+  document.getElementById('projectList').innerHTML=state.projects.map(x=>'<div class="proj '+(x.id===p.id?'active':'')+'" onclick="switchProject(\''+x.id+'\')"><span>'+esc(x.name)+'</span><span class="count">'+x.types.reduce((s,t)=>s+t.components.length,0)+(chgCount(x)?'<span class="pend" title="Cambios pendientes de implementar">'+chgCount(x)+'</span>':'')+'</span></div>').join('');
   document.getElementById('projTitle').textContent=p.name;
+  { const n=chgCount(p), b=document.getElementById('chgBtn'); if(b){ b.textContent=n?('Cambios pendientes ('+n+')'):'Cambios'; b.classList.toggle('has',!!n); } }
   renderNav();
   if(!typeOpened){ showView('viewTypes'); document.getElementById('stats').textContent=p.types.length+' tipo'+(p.types.length===1?'':'s')+' de componente'; renderTypes(); return; }
   const t=curType();
@@ -690,7 +799,7 @@ function renderNav(){
 }
 function renderTypes(){
   const p=proj();
-  document.getElementById('typeTiles').innerHTML=p.types.map(t=>'<div class="tile" onclick="openType(\''+t.id+'\')"><button class="tile-dup" title="Duplicar tipo" onclick="event.stopPropagation();dupType(\''+t.id+'\')">⧉</button><div class="tile-name">'+esc(t.name)+'</div><div class="tile-meta">'+t.components.length+' componentes · '+t.fields.length+' campos</div></div>').join('')+'<div class="tile tile-add" onclick="addType()"><div class="tile-plus">+</div><div>Nuevo tipo de componente</div></div>';
+  document.getElementById('typeTiles').innerHTML=p.types.map(t=>'<div class="tile" onclick="openType(\''+t.id+'\')"><button class="tile-dup" title="Duplicar tipo" onclick="event.stopPropagation();dupType(\''+t.id+'\')">⧉</button><div class="tile-name">'+esc(t.name)+'</div><div class="tile-meta">'+t.components.length+' componentes · '+t.fields.length+' campos'+(chgCount(p,t.id)?' <span class="pend">'+chgCount(p,t.id)+' pendientes</span>':'')+'</div></div>').join('')+'<div class="tile tile-add" onclick="addType()"><div class="tile-plus">+</div><div>Nuevo tipo de componente</div></div>';
 }
 function openType(id){ proj().activeTypeId=id; typeOpened=true; currentView='componentes'; selected.clear(); resetFilters(); const s=document.getElementById('search'); if(s)s.value=''; save(); render(); }
 function backToTypes(){ typeOpened=false; selected.clear(); render(); }
@@ -701,6 +810,8 @@ function dupType(id){ dupTypeId=id; const t=proj().types.find(x=>x.id===id); if(
 function doDupType(withContent){ const p=proj(); const src=p.types.find(x=>x.id===dupTypeId); if(!src){ closeModal('mDupType'); return; } const copy=JSON.parse(JSON.stringify(src)); copy.id=uid(); copy.name=src.name+' (copia)'; if(withContent){ copy.components.forEach(c=>c.id=uid()); } else { copy.components=[]; } p.types.push(copy); p.activeTypeId=copy.id; typeOpened=true; currentView='campos'; selected.clear(); resetFilters(); save(); closeModal('mDupType'); render(); toast(withContent?'Tipo duplicado con su contenido':'Estructura de campos duplicada'); }
 function renderComponents(){
   const p=curType();
+  _pm=chgPendMap();
+  { const ck=document.getElementById('chkPendOnly'); if(ck)ck.checked=pendOnly; }
   const df=document.getElementById('dynFilters'); df.innerHTML='';
   p.fields.forEach(f=>{
     let opts=null;
@@ -761,7 +872,7 @@ function cardHtml(c,p,rcField){
   const title=tf?(valOf(c,tf)||'(sin título)'):'(sin título)';
   let h='<div class="card-c"'+st+' ondblclick="openEdit(\''+c.id+'\')">';
   h+='<div class="card-head"><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onclick="event.stopPropagation()" ondblclick="event.stopPropagation()" onchange="toggleSel(\''+c.id+'\',this)"><span class="card-title"><span class="card-num">ID '+(c.num??'')+'</span> '+tok(title)+(p.useCardNum&&c.cardNum!=null?' <span class="icon-tag" title="N° de carta">Carta '+c.cardNum+'</span>':'')+'</span><span class="card-acts" ondblclick="event.stopPropagation()"><button class="row-btn" title="Copiar resumen" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button><button class="row-btn" title="Editar" onclick="event.stopPropagation();openEdit(\''+c.id+'\')">✎</button><button class="row-btn" title="Duplicar" onclick="event.stopPropagation();duplicate(\''+c.id+'\')">⧉</button><button class="row-btn" title="Eliminar" onclick="event.stopPropagation();removeOne(\''+c.id+'\')">🗑</button></span></div>';
-  p.fields.forEach(f=>{ if(f===tf||f.inCard===false)return; const miss=missAlert(c,f); const vh=miss?'<span class="val-miss">Falta completar</span>':cardValHtml(c,f); if(!miss&&(vh===''||vh==null))return; h+='<div class="card-field'+(miss?' miss':'')+'"><span class="lbl">'+esc(f.label)+'</span>'+vh+'</div>'; });
+  p.fields.forEach(f=>{ if(f===tf||f.inCard===false)return; const miss=missAlert(c,f); const ce=_pm&&_pm[c.id+'|'+f.id]; const vh=miss?'<span class="val-miss">Falta completar</span>':cardValHtml(c,f); if(!miss&&!ce&&(vh===''||vh==null))return; h+='<div class="card-field'+(miss?' miss':'')+(ce?' chg':'')+'">'+(ce?chgBtnHtml(c.id,f.id,ce):'')+'<span class="lbl">'+esc(f.label)+'</span>'+vh+'</div>'; });
   return h+'</div>';
 }
 function colDefault(key){ if(key==='sel')return 34; if(key==='num')return 56; if(key==='cardnum')return 80; if(key==='acc')return 90; if(key==='resumen')return 320; const f=fieldById(key); if(!f)return 150; return ({number:70,check:60,select:140,long:240,abilities:240,icons:150,multiselect:170,list:150})[f.type]||150; }
@@ -804,7 +915,7 @@ document.addEventListener('dblclick',e=>{
 });
 function isBlank(v){ return v===''||v===null||v===undefined||(Array.isArray(v)&&v.length===0); }
 function missAlert(c,f){ if(f.alertEmpty===false)return false; if(f.type==='check')return false; return isBlank(valOf(c,f)); }
-function cellHtml(c,f){ const h=cellHtmlBase(c,f); return missAlert(c,f)? h.replace('<td class="','<td class="miss ') : h; }
+function cellHtml(c,f){ let h=cellHtmlBase(c,f); if(missAlert(c,f)) h=h.replace('<td class="','<td class="miss '); const e=_pm&&_pm[c.id+'|'+f.id]; if(e){ h=h.replace('<td class="','<td class="chg '); const i=h.indexOf('>'); h=h.slice(0,i+1)+chgBtnHtml(c.id,f.id,e)+h.slice(i+1); } return h; }
 function cellHtmlBase(c,f){
   const v=valOf(c,f);
   const dcEdit=' ondblclick="editCell(this,\''+c.id+'\',\''+f.id+'\')"';
@@ -937,6 +1048,7 @@ function renderFields(){
       '<td style="text-align:center"><input type="checkbox" '+(f.inSummary!==false?'checked':'')+' onchange="toggleInSummary(\''+f.id+'\',this.checked)"></td>'+
       '<td style="text-align:center"><input type="checkbox" '+(f.inCard!==false?'checked':'')+' onchange="toggleInCard(\''+f.id+'\',this.checked)"></td>'+
       '<td style="text-align:center"><input type="checkbox" '+(f.alertEmpty!==false?'checked':'')+(f.type==='check'?' disabled title="Los campos Sí/No nunca quedan vacíos"':'')+' onchange="toggleAlertEmpty(\''+f.id+'\',this.checked)"></td>'+
+      '<td style="text-align:center"><input type="checkbox" '+(f.noTrack?'':'checked')+' onchange="toggleTrackField(\''+f.id+'\',this.checked)"></td>'+
       '<td style="text-align:center"><input type="radio" name="primaryField" '+(f.primary?'checked':'')+' onchange="setPrimary(\''+f.id+'\')"></td>'+
       '<td style="white-space:nowrap"><button class="row-btn" title="Duplicar campo" onclick="duplicateField(\''+f.id+'\')">⧉</button><button class="row-btn" onclick="deleteField(\''+f.id+'\')">🗑</button></td></tr>';
   }).join('');
@@ -971,9 +1083,9 @@ function duplicateField(id){
   const i=p.fields.findIndex(x=>x.id===id);
   p.fields.splice(i+1,0,copy);
   p.components.forEach(c=>{ if(c.values[id]!==undefined) c.values[copy.id]=JSON.parse(JSON.stringify(c.values[id])); });
-  save(); renderFields(); toast('Campo duplicado');
+  save(); render(); flushCloud(); toast('Campo duplicado');
 }
-function deleteField(id){ const p=curType(); const f=fieldById(id); if(p.fields.length<=1){toast('Debe quedar al menos un campo');return;} if(!confirm('¿Eliminar el campo "'+f.label+'"? Se borrará su valor en todas las cartas.'))return; p.fields=p.fields.filter(x=>x.id!==id); if(f.primary&&p.fields.length)p.fields[0].primary=true; p.components.forEach(c=>{delete c.values[id];}); save(); renderFields(); }
+function deleteField(id){ const p=curType(); const f=fieldById(id); if(p.fields.length<=1){toast('Debe quedar al menos un campo');return;} if(!confirm('¿Eliminar el campo "'+f.label+'"? Se borrará su valor en todas las cartas.'))return; p.fields=p.fields.filter(x=>x.id!==id); if(f.primary&&p.fields.length)p.fields[0].primary=true; p.components.forEach(c=>{delete c.values[id];}); save(); render(); flushCloud(); toast('Campo "'+f.label+'" eliminado'); }
 
 /* ---------- Sub-editor: biblioteca de habilidades de un campo ---------- */
 function libField(){ return fieldById(libFieldId); }
@@ -1232,24 +1344,81 @@ function removeOne(id){ const c=curType().components.find(x=>x.id===id); if(!con
 
 /* ---------- Lote ---------- */
 let currentBulkData = [];
+let bulkColMapState = {};   // columna -> id de campo elegido (preserva selecciones)
+let bulkNewFieldIds = new Set(); // campos creados dentro de este import (para poder configurar su tipo)
+let bulkHasHeader = false;      // ¿la 1ª fila pegada es encabezado?
+let bulkHeaderUserSet = false;  // el usuario ya tocó la casilla (no volver a autodetectar)
+// ¿es numérico? (acepta coma o punto decimal)
+function bulkIsNum(v){ v=String(v).trim(); return v!=='' && !isNaN(+v.replace(',','.')); }
+// Heurística: decide si la primera fila parece un encabezado
+function detectBulkHeader(rows, fields){
+  if(rows.length < 2) return false;
+  const head = rows[0];
+  const labels = fields.map(f=>f.label.trim().toLowerCase());
+  // 1) algún título coincide con un campo existente
+  if(head.some(c => c && labels.includes(String(c).trim().toLowerCase()))) return true;
+  // 2) alguna columna: título es texto pero los datos de abajo son numéricos
+  const maxc = Math.max(...rows.map(r=>r.length));
+  let signal=0, checked=0;
+  for(let c=0;c<maxc;c++){
+    const h=String(head[c]||'').trim();
+    if(!h) continue;
+    const rest = rows.slice(1).map(r=>String(r[c]||'').trim()).filter(x=>x!=='');
+    if(!rest.length) continue;
+    checked++;
+    const restNum = rest.filter(bulkIsNum).length;
+    if(!bulkIsNum(h) && restNum/rest.length >= 0.6) signal++;
+  }
+  return checked>0 && signal>0;
+}
 function renderBulkPreview(){
   const text = document.getElementById('bulkText').value;
   const wrap = document.getElementById('bulkPreviewWrap');
   if(!text.trim()){ wrap.innerHTML=''; currentBulkData=[]; return; }
+  // conservar lo que el usuario ya eligió antes de reconstruir la tabla
+  document.querySelectorAll('.bulk-col-sel').forEach(s=>{ if(s.value!=='__new__') bulkColMapState[s.getAttribute('data-col')] = s.value; });
   const lines = text.split('\n').map(l=>l.replace(/\r$/,'')).filter(l=>l.trim());
-  currentBulkData = lines.map(line => line.includes('\t')?line.split('\t'):line.split(' | '));
-  let maxCols = 0;
-  currentBulkData.forEach(cols => { if(cols.length > maxCols) maxCols = cols.length; });
+  const allRows = lines.map(line => line.includes('\t')?line.split('\t'):line.split(' | '));
   const p = curType();
-  const simple = p.fields.filter(f=>f.type!=='abilities'&&f.type!=='icons');
-  let html = '<table style="margin-top:8px"><thead><tr>';
+  // autodetectar encabezado (solo hasta que el usuario decida manualmente)
+  if(!bulkHeaderUserSet) bulkHasHeader = detectBulkHeader(allRows, p.fields);
+  const headerRow = bulkHasHeader ? allRows[0] : null;
+  currentBulkData = bulkHasHeader ? allRows.slice(1) : allRows;
+  let maxCols = 0;
+  allRows.forEach(cols => { if(cols.length > maxCols) maxCols = cols.length; });
+  // campos asignables: todos menos habilidades/íconos, más los recién creados aquí
+  const mapFields = p.fields.filter(f => (f.type!=='abilities' && f.type!=='icons') || bulkNewFieldIds.has(f.id));
+  let html = '<label style="display:inline-flex;align-items:center;gap:7px;font-weight:normal;font-size:13px;margin:2px 0 8px;cursor:pointer"><input type="checkbox" id="bulkHeaderChk" '+(bulkHasHeader?'checked':'')+' onchange="onBulkHeaderToggle(this)"> La primera fila es un <b>encabezado</b> (no se importa como dato)</label>';
+  html += '<table style="margin-top:2px"><thead><tr>';
   for(let i=0; i<maxCols; i++){
-    let opts = '<option value="">(Descartar columna)</option>';
-    simple.forEach((f, idx) => {
-      const sel = (i === idx) ? 'selected' : '';
+    const hdr = headerRow ? String(headerRow[i]||'').trim() : '';
+    // valor elegido: lo guardado; si no, por nombre del encabezado; si no, por posición
+    let selVal = bulkColMapState[i];
+    if(selVal === undefined){
+      if(headerRow){
+        const h = hdr.toLowerCase();
+        const match = h ? mapFields.find(f=>f.label.trim().toLowerCase()===h) : null;
+        selVal = match ? match.id : '';
+      } else {
+        selVal = mapFields[i] ? mapFields[i].id : '';
+      }
+    }
+    let opts = '<option value=""'+(selVal===''?' selected':'')+'>(Descartar columna)</option>';
+    mapFields.forEach(f => {
+      const sel = (f.id === selVal) ? 'selected' : '';
       opts += '<option value="'+f.id+'" '+sel+'>'+esc(f.label)+'</option>';
     });
-    html += '<th><select class="bulk-col-sel" data-col="'+i+'" style="width:100%; min-width:120px; font-weight:normal;">'+opts+'</select></th>';
+    opts += '<option value="__new__">➕ Crear campo nuevo…</option>';
+    html += '<th style="vertical-align:top">';
+    if(headerRow) html += '<div style="font-size:11px;color:var(--muted);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+esc(hdr)+'">'+(hdr?esc(hdr):'—')+'</div>';
+    html += '<select class="bulk-col-sel" data-col="'+i+'" data-hdr="'+esc(hdr)+'" onchange="onBulkColChange(this)" style="width:100%; min-width:130px; font-weight:normal;">'+opts+'</select>';
+    // si la columna quedó mapeada a un campo recién creado, configurar su tipo aquí mismo (mismas opciones que la pestaña Campos)
+    if(bulkNewFieldIds.has(selVal)){
+      const nf = fieldById(selVal);
+      let tOpts = Object.keys(FIELD_TYPES).map(t=>'<option value="'+t+'" '+(nf&&nf.type===t?'selected':'')+'>'+FIELD_TYPES[t]+'</option>').join('');
+      html += '<div style="margin-top:4px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px">Tipo: <select class="bulk-newtype" data-fld="'+selVal+'" onchange="onBulkTypeChange(this)" style="flex:1;font-weight:normal;font-size:12px">'+tOpts+'</select></div>';
+    }
+    html += '</th>';
   }
   html += '</tr></thead><tbody>';
   const previewRows = currentBulkData.slice(0, 5);
@@ -1266,12 +1435,43 @@ function renderBulkPreview(){
   }
   wrap.innerHTML = html;
 }
-function openBulkAdd(){ 
-  document.getElementById('bulkText').value=''; 
+function onBulkHeaderToggle(chk){ bulkHasHeader = chk.checked; bulkHeaderUserSet = true; renderBulkPreview(); }
+function openBulkAdd(){
+  document.getElementById('bulkText').value='';
   document.getElementById('bulkPreviewWrap').innerHTML='';
-  document.getElementById('bulkHint').innerHTML='Pega filas (columnas separadas por tabulación). A continuación podrás asignar cada columna al campo correspondiente. Solo <b>'+esc(primaryField().label)+'</b> es obligatorio.'; 
+  document.getElementById('bulkHint').innerHTML='Pega filas (columnas separadas por tabulación). A continuación podrás asignar cada columna a un campo existente o <b>crear uno nuevo</b>. Solo <b>'+esc(primaryField().label)+'</b> es obligatorio.';
   currentBulkData = [];
-  openModal('mBulkAdd'); 
+  bulkColMapState = {};
+  bulkNewFieldIds = new Set();
+  bulkHasHeader = false;
+  bulkHeaderUserSet = false;
+  openModal('mBulkAdd');
+}
+// El usuario cambió el campo asignado a una columna
+function onBulkColChange(sel){
+  const i = sel.getAttribute('data-col');
+  if(sel.value === '__new__'){ createFieldForColumn(i, sel); return; }
+  bulkColMapState[i] = sel.value;
+  renderBulkPreview();
+}
+// Crear un campo nuevo desde la propia importación y asignarlo a esta columna
+function createFieldForColumn(i, sel){
+  const suggested = sel.getAttribute('data-hdr') || '';  // si hay encabezado, propón ese nombre
+  const name = prompt('Nombre del nuevo campo:', suggested);
+  if(name === null || !name.trim()){ sel.value = bulkColMapState[i] || ''; return; }
+  const nf = {id: fid(), label: name.trim(), type: 'text'};
+  curType().fields.push(nf);
+  bulkNewFieldIds.add(nf.id);
+  bulkColMapState[i] = nf.id;
+  save();
+  if(typeof renderFields === 'function' && document.getElementById('fieldBody')) renderFields();
+  renderBulkPreview();
+  toast('Campo "'+nf.label+'" creado');
+}
+// Cambiar el tipo de un campo recién creado, sin salir de la importación
+function onBulkTypeChange(sel){
+  const f = fieldById(sel.getAttribute('data-fld'));
+  if(f){ f.type = sel.value; save(); renderBulkPreview(); }
 }
 function saveBulkAdd(){
   if(currentBulkData.length === 0){ toast('No hay datos para agregar'); return; }
@@ -1289,7 +1489,8 @@ function saveBulkAdd(){
       if(!raw) return;
       const f = fieldById(fieldId);
       if(!f) return;
-      if(f.type==='number') values[fieldId]=+raw||0; 
+      if(f.type==='abilities'||f.type==='icons') return; // estos no se llenan desde texto pegado
+      if(f.type==='number') values[fieldId]=+raw||0;
       else if(f.type==='check') values[fieldId]=/^(s[ií]|x|1|true|yes)$/i.test(raw); 
       else if(f.type==='list'||f.type==='multiselect') values[fieldId]=splitList(raw); 
       else values[fieldId]=raw; 
