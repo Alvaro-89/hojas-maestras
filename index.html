@@ -102,7 +102,7 @@
   .sum-hab .t{display:inline-block; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; margin-right:6px; color:var(--muted);}
   .sum-hab.act .t{color:var(--blue);} .sum-hab.pas .t{color:var(--green);}
   .icon-tag{display:inline-block; background:#f0ede4; border:1px solid var(--line); padding:1px 7px; border-radius:6px; font-size:11.5px; margin:1px 2px 1px 0; white-space:nowrap;}
-  .cell-hab{max-width:280px;} .cell-icon{max-width:150px;}
+  .cell-hab{white-space:normal; vertical-align:top;} .cell-hab .sum-hab:first-of-type{margin-top:0;} .cell-icon{max-width:150px;}
   .empty{text-align:center; color:var(--muted); padding:60px 20px; font-size:14px;}
   .vswitch{display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden;}
   .vswitch button{border:none; background:var(--panel); padding:8px 12px; font-size:13px; cursor:pointer; color:var(--muted);}
@@ -881,7 +881,7 @@ function cardHtml(c,p,rcField){
   p.fields.forEach(f=>{ if(f===tf||f.inCard===false)return; const miss=missAlert(c,f); const ce=_pm&&_pm[c.id+'|'+f.id]; const vh=miss?'<span class="val-miss">Falta completar</span>':cardValHtml(c,f); if(!miss&&!ce&&(vh===''||vh==null))return; h+='<div class="card-field'+(miss?' miss':'')+(ce?' chg':'')+'">'+(ce?chgBtnHtml(c.id,f.id,ce):'')+'<span class="lbl">'+esc(f.label)+'</span>'+vh+'</div>'; });
   return h+'</div>';
 }
-function colDefault(key){ if(key==='sel')return 34; if(key==='num')return 56; if(key==='cardnum')return 80; if(key==='acc')return 90; if(key==='resumen')return 320; const f=fieldById(key); if(!f)return 150; return ({number:70,check:60,select:140,long:240,abilities:240,icons:150,multiselect:170,list:150})[f.type]||150; }
+function colDefault(key){ if(key==='sel')return 34; if(key==='num')return 56; if(key==='cardnum')return 80; if(key==='acc')return 90; if(key==='resumen')return 320; const f=fieldById(key); if(!f)return 150; return ({number:70,check:60,select:140,long:240,abilities:340,icons:150,multiselect:170,list:150})[f.type]||150; }
 function colWidth(key){ const p=curType(); return (p.colW&&p.colW[key])||colDefault(key); }
 function tableWidth(){ const p=curType(); let s=colWidth('sel')+colWidth('num')+(p.useCardNum?colWidth('cardnum'):0); p.fields.forEach(f=>s+=colWidth(f.id)); return s+colWidth('resumen')+colWidth('acc'); }
 function colgroup(){ const p=curType(); let g='<colgroup><col id="col_sel" style="width:'+colWidth('sel')+'px"><col id="col_num" style="width:'+colWidth('num')+'px">'; if(p.useCardNum)g+='<col id="col_cardnum" style="width:'+colWidth('cardnum')+'px">'; p.fields.forEach(f=>g+='<col id="col_'+f.id+'" style="width:'+colWidth(f.id)+'px">'); g+='<col id="col_resumen" style="width:'+colWidth('resumen')+'px"><col id="col_acc" style="width:'+colWidth('acc')+'px"></colgroup>'; return g; }
@@ -926,7 +926,7 @@ function cellHtmlBase(c,f){
   const v=valOf(c,f);
   const dcEdit=' ondblclick="editCell(this,\''+c.id+'\',\''+f.id+'\')"';
   const dcOpen=' ondblclick="openEdit(\''+c.id+'\')"';
-  if(f.type==='abilities'){ const chips=abilSorted(f,v).map(id=>{const a=(f.library||[]).find(x=>x.id===id); if(!a)return''; const cls=a.tipo==='Activa'?'act':a.tipo==='Pasiva'?'pas':''; return '<span class="chip '+cls+'"'+chipStyle(f,a.tipo)+' title="'+esc(abilityFull(a))+'">'+tok(a.nombre||a.texto)+'</span>';}).join(''); return '<td class="cell-hab ec"'+dcOpen+'>'+chips+'</td>'; }
+  if(f.type==='abilities'){ return '<td class="cell-hab ec"'+dcOpen+'>'+abilBlocksHtml(f,v)+'</td>'; }
   if(f.type==='icons'){ const t=(v||[]).map(x=>'<span class="icon-tag">'+esc(x.tipo)+' ×'+x.cantidad+'</span>').join(''); return '<td class="cell-icon ec"'+dcOpen+'>'+t+'</td>'; }
   if(f.type==='check') return '<td class="ec"'+dcEdit+'>'+(v?'<span class="yes">✓</span>':'<span class="no">—</span>')+'</td>';
   if(f.type==='long'){ const shown=tok(String(v).length>140?String(v).slice(0,140)+'…':v); return '<td class="long ec"'+dcEdit+' title="'+esc(v)+'">'+(f.italic?'<i>'+shown+'</i>':shown)+'</td>'; }
@@ -936,12 +936,13 @@ function cellHtmlBase(c,f){
   if(f.primary) return '<td class="ec"'+dcEdit+'><b>'+(f.italic?'<i>'+tok(v||'(sin título)')+'</i>':tok(v||'(sin título)'))+'</b></td>';
   return '<td class="ec"'+dcEdit+'>'+(f.italic?'<i>'+tok(v)+'</i>':tok(v))+'</td>';
 }
+function abilBlocksHtml(f,v){ return abilSorted(f,v).map(id=>{ const a=(f.library||[]).find(x=>x.id===id); if(!a)return ''; const cls=a.tipo==='Activa'?'act':a.tipo==='Pasiva'?'pas':''; const cc=f.tipoColors&&f.tipoColors[a.tipo]; const st=cc?' style="background:'+cc.bg+';border-left-color:'+cc.fg+';color:'+cc.fg+'"':''; const tst=cc?' style="color:'+cc.fg+'"':''; return '<span class="sum-hab '+cls+'"'+st+'>'+(a.tipo&&a.tipo!=='General'?'<span class="t"'+tst+'>'+esc(a.tipo)+'</span>':'')+'<b>'+tok(a.nombre||'')+'</b>'+(a.texto?': '+tok(a.texto):'')+'</span>'; }).join(''); }
 function summaryText(c){ const t=curType(); const parts=[]; if(t.useCardNum&&c.cardNum!=null) parts.push('N° carta: '+c.cardNum); t.fields.forEach(f=>{ if(f.inSummary===false)return; const val=fieldOut(c,f); if(val!==''&&val!=null) parts.push(f.label+': '+val); }); return parts.join('\n'); }
 function summaryHtml(c){
   const t=curType(); const parts=[];
   if(t.useCardNum&&c.cardNum!=null) parts.push('<b>N° carta:</b> '+c.cardNum);
   t.fields.forEach(f=>{ if(f.inSummary===false)return;
-    if(f.type==='abilities'){ const h=abilSorted(f,valOf(c,f)).map(id=>{ const a=(f.library||[]).find(x=>x.id===id); if(!a)return ''; const cls=a.tipo==='Activa'?'act':a.tipo==='Pasiva'?'pas':''; const cc=f.tipoColors&&f.tipoColors[a.tipo]; const st=cc?' style="background:'+cc.bg+';border-left-color:'+cc.fg+';color:'+cc.fg+'"':''; const tst=cc?' style="color:'+cc.fg+'"':''; return '<span class="sum-hab '+cls+'"'+st+'>'+(a.tipo&&a.tipo!=='General'?'<span class="t"'+tst+'>'+esc(a.tipo)+'</span>':'')+'<b>'+tok(a.nombre||'')+'</b>'+(a.texto?': '+tok(a.texto):'')+'</span>'; }).join(''); if(h) parts.push('<b>'+esc(f.label)+':</b>'+h); return; }
+    if(f.type==='abilities'){ const h=abilBlocksHtml(f,valOf(c,f)); if(h) parts.push('<b>'+esc(f.label)+':</b>'+h); return; }
     const val=fieldOut(c,f); if(val!==''&&val!=null) parts.push('<b>'+esc(f.label)+':</b> '+(f.italic?'<i>'+tok(val)+'</i>':tok(val))); });
   return '<td class="long ec" style="max-width:360px" ondblclick="openEdit(\''+c.id+'\')"><button class="row-btn" title="Copiar resumen" style="float:right;font-size:15px" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button>'+parts.join('<br>')+'</td>';
 }
