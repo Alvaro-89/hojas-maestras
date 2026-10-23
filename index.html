@@ -168,6 +168,8 @@
   .iconrow2 .icon-tag{justify-self:start;}
   .tok{display:inline-flex;align-items:center;vertical-align:-3px;}
   .tok svg,.tok img{width:16px;height:16px;display:block;}
+.icon-rep{margin:1px 2px 1px 0;}
+.icon-rep svg,.icon-rep img{width:20px;height:20px;border-radius:3px;}
   .tok-prev svg,.tok-prev img{width:24px;height:24px;}
   .ms-box{display:flex; flex-wrap:wrap; gap:6px;}
   .ms-opt{display:inline-flex; align-items:center; gap:5px; border:1px solid var(--line); padding:5px 9px; border-radius:16px; cursor:pointer; font-size:13px;}
@@ -864,7 +866,7 @@ function setCompView(m){ curType().viewMode=m; save(); render(); }
 function cardValHtml(c,f){
   const v=valOf(c,f);
   if(f.type==='abilities') return abilSorted(f,v).map(id=>{const a=(f.library||[]).find(x=>x.id===id); if(!a)return''; const cls=a.tipo==='Activa'?'act':a.tipo==='Pasiva'?'pas':''; return '<span class="chip '+cls+'"'+chipStyle(f,a.tipo)+' title="'+esc(abilityFull(a))+'">'+tok(a.nombre||a.texto)+'</span>';}).join('');
-  if(f.type==='icons') return (v||[]).map(x=>'<span class="icon-tag">'+esc(x.tipo)+' ×'+x.cantidad+'</span>').join('');
+  if(f.type==='icons') return iconsHtml(v);
   if(f.type==='check') return v?'<span class="yes">✓</span>':'<span class="no">—</span>';
   if(f.type==='multiselect') return (Array.isArray(v)?v:[]).map(x=>{const col=(f.colors||{})[x]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; return '<span class="tag"'+st+'>'+tok(x)+'</span>';}).join('');
   if(f.type==='list') return (Array.isArray(v)?v:[]).map(x=>'<span class="tag">'+tok(x)+'</span>').join('');
@@ -927,7 +929,7 @@ function cellHtmlBase(c,f){
   const dcEdit=' ondblclick="editCell(this,\''+c.id+'\',\''+f.id+'\')"';
   const dcOpen=' ondblclick="openEdit(\''+c.id+'\')"';
   if(f.type==='abilities'){ return '<td class="cell-hab ec"'+dcOpen+'>'+abilBlocksHtml(f,v)+'</td>'; }
-  if(f.type==='icons'){ const t=(v||[]).map(x=>'<span class="icon-tag">'+esc(x.tipo)+' ×'+x.cantidad+'</span>').join(''); return '<td class="cell-icon ec"'+dcOpen+'>'+t+'</td>'; }
+  if(f.type==='icons'){ const t=iconsHtml(v); return '<td class="cell-icon ec"'+dcOpen+'>'+t+'</td>'; }
   if(f.type==='check') return '<td class="ec"'+dcEdit+'>'+(v?'<span class="yes">✓</span>':'<span class="no">—</span>')+'</td>';
   if(f.type==='long'){ const shown=tok(String(v).length>140?String(v).slice(0,140)+'…':v); return '<td class="long ec"'+dcEdit+' title="'+esc(v)+'">'+(f.italic?'<i>'+shown+'</i>':shown)+'</td>'; }
   if(f.type==='multiselect') return '<td class="ec"'+dcEdit+'>'+(Array.isArray(v)?v:[]).map(x=>{const col=(f.colors||{})[x]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; return '<span class="tag"'+st+'>'+tok(x)+'</span>';}).join('')+'</td>';
@@ -1233,6 +1235,10 @@ function tokMatch(word,palabra){ const a=tokForms(word),b=tokForms(palabra); for
 function tokIconHtml(it){ if(it.img)return '<img src="'+it.img+'" alt="">'; const g=TOK_GLYPHS[it.glyph]||TOK_GLYPHS.hoja; return '<svg viewBox="0 0 24 24" fill="none" stroke="'+esc(it.color||'#555')+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">'+g.svg+'</svg>'; }
 function tokApply(str){ const list=tokList(); if(!list.length)return str; return String(str).replace(/\[([^\[\]\n]{1,60})\]/g,(m,w)=>{ const it=list.find(x=>tokMatch(w,x.palabra)); return it?'<span class="tok" title="'+esc(w)+'">'+tokIconHtml(it)+'</span>':m; }); }
 function tok(v){ return tokApply(esc(v)); }
+// Campo de íconos: si el ícono existe en la Iconografía del juego, se dibuja repetido según la cantidad (2 hierbas = 2 dibujos); si no, queda como texto "Nombre ×N".
+function iconFind(nombre){ return tokList().find(t=>tokMatch(nombre,t.palabra)); }
+function iconGlyph(nombre){ const it=iconFind(nombre); return it?'<span class="tok icon-rep">'+tokIconHtml(it)+'</span> ':''; }
+function iconsHtml(v){ return (Array.isArray(v)?v:[]).map(x=>{ const it=iconFind(x.tipo); if(!it)return '<span class="icon-tag">'+esc(x.tipo)+' ×'+x.cantidad+'</span>'; let h=''; const n=Math.max(1,parseInt(x.cantidad)||1); for(let i=0;i<n;i++)h+='<span class="tok icon-rep" title="'+esc(x.tipo)+'">'+tokIconHtml(it)+'</span>'; return h; }).join(''); }
 function openTokens(){ const sIn=document.getElementById('tokSearch'); if(sIn)sIn.value=''; renderTokens(); openModal('mTokens'); }
 function closeTokens(){ closeModal('mTokens'); render(); }
 function renderTokens(){
@@ -1300,7 +1306,7 @@ function fieldInputHtml(f){
   }
   if(f.type==='icons'){
     const cur=(v&&typeof v==='object'&&!Array.isArray(v))?v:{};
-    const rows=(f.iconSet||[]).length?(f.iconSet).map(it=>{ const c=cur[it.nombre]||0; let opts=''; for(let n=0;n<=it.max;n++)opts+='<option value="'+n+'" '+(n===c?'selected':'')+'>'+n+'</option>'; return '<div class="iconrow2"><span class="icon-tag">'+esc(it.nombre)+'</span><select onchange="setIconVal(\''+f.id+'\',\''+esc(it.nombre).replace(/'/g,"\\'")+'\',this.value)">'+opts+'</select><span class="usecount">máx '+it.max+'</span></div>'; }).join(''):'<div class="hint">Sin íconos. Créalos en la pestaña Campos.</div>';
+    const rows=(f.iconSet||[]).length?(f.iconSet).map(it=>{ const c=cur[it.nombre]||0; let opts=''; for(let n=0;n<=it.max;n++)opts+='<option value="'+n+'" '+(n===c?'selected':'')+'>'+n+'</option>'; return '<div class="iconrow2"><span class="icon-tag">'+iconGlyph(it.nombre)+esc(it.nombre)+'</span><select onchange="setIconVal(\''+f.id+'\',\''+esc(it.nombre).replace(/'/g,"\\'")+'\',this.value)">'+opts+'</select><span class="usecount">máx '+it.max+'</span></div>'; }).join(''):'<div class="hint">Sin íconos. Créalos en la pestaña Campos.</div>';
     return '<div class="fld special">'+lab+rows+'</div>';
   }
   if(f.type==='long') return '<div class="fld">'+lab+'<textarea rows="3"'+(f.italic?' style="font-style:italic"':'')+' oninput="setVal(\''+f.id+'\',this.value)">'+esc(v||'')+'</textarea></div>';
