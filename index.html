@@ -534,7 +534,7 @@ function applyCloud(d){
       if(!state.projects.some(p=>p.id===state.activeId))state.activeId=state.projects[0].id;
       selected.clear(); resetFilters();
       histRecord();
-      localStorage.setItem(KEY, JSON.stringify(state));
+      cacheLocal(JSON.stringify(state));
       render();
     }
   }catch(e){}
@@ -568,7 +568,7 @@ function restoreState(str){
   s.projects.forEach(migrateProject); state=s;
   if(!state.projects.some(x=>x.id===state.activeId))state.activeId=state.projects[0].id;
   lastSaved=JSON.stringify(state); selected.clear();
-  localStorage.setItem(KEY,lastSaved);
+  cacheLocal(lastSaved);
   if(cloudReady){ clearTimeout(saveTimer); saveTimer=setTimeout(pushCloud,600); }
   render(); updateUndoBtns();
 }
@@ -657,7 +657,10 @@ function migrateProject(p){
   return p;
 }
 function load(){ try{ const raw=localStorage.getItem(KEY); if(raw){ const s=JSON.parse(raw); if(s.projects&&s.projects.length){ s.projects.forEach(migrateProject); return s; } } }catch(e){} const p=newProject('Mi primer juego'); return {projects:[p], activeId:p.id}; }
-function save(){ chgTrack(lastSaved); histRecord(); lastLocalEdit=Date.now(); localStorage.setItem(KEY, JSON.stringify(state)); if(cloudReady){ clearTimeout(saveTimer); saveTimer=setTimeout(pushCloud,600); } }
+// Copia local en el navegador: si el navegador se queda sin espacio, no debe impedir que el cambio se guarde en la nube.
+let cacheWarned=false;
+function cacheLocal(str){ try{ localStorage.setItem(KEY,str); }catch(e){ if(!cacheWarned){ cacheWarned=true; console.warn('Copia local no guardada:',e); try{ toast('El navegador no tiene espacio para la copia local; los cambios se guardan igual en la nube'); }catch(_){} } } }
+function save(){ chgTrack(lastSaved); histRecord(); lastLocalEdit=Date.now(); cacheLocal(JSON.stringify(state)); if(cloudReady){ clearTimeout(saveTimer); saveTimer=setTimeout(pushCloud,600); } }
 function proj(){ return state.projects.find(p=>p.id===state.activeId)||state.projects[0]; }
 function curType(){ const p=proj(); return p.types.find(t=>t.id===p.activeTypeId)||p.types[0]; }
 function fieldById(id){ return curType().fields.find(f=>f.id===id); }
