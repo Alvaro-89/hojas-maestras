@@ -110,6 +110,11 @@
   .cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:14px; padding:2px 0 24px;}
   .card-c{position:relative; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,.05);}
   .card-c:hover{border-color:var(--accent);}
+  tr.descartada>td{opacity:.45;}
+  .card-c.descartada{opacity:.5;}
+  .selpill{display:inline-block;min-width:30px;text-align:center;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;user-select:none;}
+  .selpill.on{background:#e3f1e6;color:#2f7d4f;}
+  .selpill.off{background:#f6dcdc;color:#a33a3a;}
   .card-head{display:flex; align-items:flex-start; gap:8px; margin-bottom:8px;}
   .card-head input{margin-top:3px;}
   .card-title{font-size:15px; font-weight:600; flex:1; line-height:1.3;}
@@ -595,7 +600,10 @@ document.addEventListener('keydown',e=>{
   if(k==='z'&&!e.shiftKey){ e.preventDefault(); undoChange(); }
   else if(k==='y'||(k==='z'&&e.shiftKey)){ e.preventDefault(); redoChange(); }
 });
-let editingId=null, editValues={}, editNumVal=null, editCardVal='';
+let editingId=null, editValues={}, editNumVal=null, editCardVal='', editSelVal=true;
+// Componente seleccionado (en uso) o no seleccionado (se hizo pero no se usa). Por defecto todo está seleccionado; se guarda c.descartada=true.
+function isSelc(c){ return c.descartada!==true; }
+function toggleUso(id){ const c=curType().components.find(x=>x.id===id); if(!c)return; if(c.descartada)delete c.descartada; else c.descartada=true; save(); render(); }
 let sortKey=null, sortDir=1, filterState={}, exportFmt='texto', currentView='componentes';
 let libFieldId=null, setFieldId=null, libColorDraft={};
 const selected=new Set();
@@ -785,6 +793,7 @@ function visibleComponents(){
   const pendSet=pendOnly?new Set(chgLog(proj()).filter(e=>!e.done).map(e=>e.cardId)):null;
   let list=p.components.filter(c=>{
     if(pendSet&&!pendSet.has(c.id))return false;
+    if(filterState._selc){ if((filterState._selc==='si')!==isSelc(c))return false; }
     for(const k in filterState){ const f=fieldById(k); const fv=filterState[k]; if(!f||!fv)continue; const v=valOf(c,f);
       if(f.type==='multiselect'||f.type==='list'||f.type==='abilities'){ if(!(Array.isArray(v)&&v.includes(fv)))return false; }
       else if(f.type==='icons'){ if(!(Array.isArray(v)&&v.some(x=>x.tipo===fv)))return false; }
@@ -825,7 +834,7 @@ function renderNav(){
 }
 function renderTypes(){
   const p=proj();
-  document.getElementById('typeTiles').innerHTML=p.types.map(t=>'<div class="tile" onclick="openType(\''+t.id+'\')"><button class="tile-dup" title="Duplicar tipo" onclick="event.stopPropagation();dupType(\''+t.id+'\')">⧉</button><div class="tile-name">'+esc(t.name)+'</div><div class="tile-meta">'+t.components.length+' componentes · '+t.fields.length+' campos</div>'+(chgCount(p,t.id)?'<div class="tile-pend"><span class="pend">'+chgCount(p,t.id)+' pendiente'+(chgCount(p,t.id)===1?'':'s')+'</span></div>':'')+'</div>').join('')+'<div class="tile tile-add" onclick="addType()"><div class="tile-plus">+</div><div>Nuevo tipo de componente</div></div>';
+  document.getElementById('typeTiles').innerHTML=p.types.map(t=>'<div class="tile" onclick="openType(\''+t.id+'\')"><button class="tile-dup" title="Duplicar tipo" onclick="event.stopPropagation();dupType(\''+t.id+'\')">⧉</button><div class="tile-name">'+esc(t.name)+'</div><div class="tile-meta">'+t.components.length+' componentes'+(t.components.some(c=>c.descartada)?' ('+t.components.filter(c=>c.descartada).length+' no seleccionados)':'')+' · '+t.fields.length+' campos</div>'+(chgCount(p,t.id)?'<div class="tile-pend"><span class="pend">'+chgCount(p,t.id)+' pendiente'+(chgCount(p,t.id)===1?'':'s')+'</span></div>':'')+'</div>').join('')+'<div class="tile tile-add" onclick="addType()"><div class="tile-plus">+</div><div>Nuevo tipo de componente</div></div>';
 }
 function openType(id){ proj().activeTypeId=id; typeOpened=true; currentView='componentes'; selected.clear(); resetFilters(); const s=document.getElementById('search'); if(s)s.value=''; save(); render(); }
 function backToTypes(){ typeOpened=false; selected.clear(); render(); }
@@ -839,6 +848,7 @@ function renderComponents(){
   _pm=chgPendMap();
   { const ck=document.getElementById('chkPendOnly'); if(ck)ck.checked=pendOnly; }
   const df=document.getElementById('dynFilters'); df.innerHTML='';
+  { const cur=filterState._selc||''; df.innerHTML+='<select onchange="setFilter(\'_selc\',this.value)"><option value="">Seleccionada: todas</option><option value="si" '+(cur==='si'?'selected':'')+'>Seleccionada: sí</option><option value="no" '+(cur==='no'?'selected':'')+'>Seleccionada: no</option></select> '; }
   p.fields.forEach(f=>{
     let opts=null;
     if(f.type==='select') opts=[...new Set(p.components.map(c=>valOf(c,f)).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'es')).map(v=>[v,v]);
@@ -859,12 +869,14 @@ function renderComponents(){
   let head='<tr><th class="nosort"><input type="checkbox" id="selAll" onchange="toggleAll(this)"><span class="rsz" onmousedown="startResize(event,\'sel\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'sel\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>';
   head+='<th onclick="setSort(\'_num\')">ID<span class="rsz" onmousedown="startResize(event,\'num\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'num\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>';
   if(p.useCardNum) head+='<th onclick="setSort(\'_cardnum\')">N° carta<span class="rsz" onmousedown="startResize(event,\'cardnum\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'cardnum\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>';
+  head+='<th class="nosort" title="¿Se usa este componente? Clic en Sí/No para cambiarlo">Selecc.<span class="rsz" onmousedown="startResize(event,\'selc\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'selc\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>';
   p.fields.forEach(f=> head+='<th draggable="true" class="col-drag" onclick="setSort(\''+f.id+'\')" ondragstart="colDragStart(event,\''+f.id+'\')" ondragover="colDragOver(event,\''+f.id+'\')" ondragleave="colDragLeave(event)" ondrop="colDrop(event,\''+f.id+'\')" ondragend="colDragEnd(event)" title="Arrastra para reordenar la columna">'+esc(f.label)+(f.primary?' ★':'')+'<span class="rsz" draggable="false" onmousedown="startResize(event,\''+f.id+'\')" onclick="event.stopPropagation()" ondblclick="autoFit(\''+f.id+'\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>');
   head+='<th class="nosort">Resumen<span class="rsz" onmousedown="startResize(event,\'resumen\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'resumen\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th><th class="nosort"><span class="rsz" onmousedown="startResize(event,\'acc\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'acc\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th></tr>';
   const rcField=p.fields.find(f=>f.rowColor&&(f.type==='select'||f.type==='multiselect'));
-  const rows=list.map(c=>{ let rs=''; if(rcField){ let rv=valOf(c,rcField); if(Array.isArray(rv))rv=rv[0]; const col=(rcField.colors||{})[rv]; if(col)rs=' style="background:'+hexA(col,0.13)+'"'; } let r='<tr'+rs+'><td><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onchange="toggleSel(\''+c.id+'\',this)"></td>';
+  const rows=list.map(c=>{ let rs=''; if(rcField){ let rv=valOf(c,rcField); if(Array.isArray(rv))rv=rv[0]; const col=(rcField.colors||{})[rv]; if(col)rs=' style="background:'+hexA(col,0.13)+'"'; } let r='<tr'+rs+(isSelc(c)?'':' class="descartada"')+'><td><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onchange="toggleSel(\''+c.id+'\',this)"></td>';
     r+='<td style="color:var(--muted);font-weight:600">'+(c.num??'')+'</td>';
     if(p.useCardNum) r+='<td class="ec" style="color:var(--muted);font-weight:600" ondblclick="editNum(this,\''+c.id+'\',\'cardNum\')">'+(c.cardNum??'')+'</td>';
+    r+='<td><span class="selpill '+(isSelc(c)?'on':'off')+'" title="Clic para cambiar" onclick="toggleUso(\''+c.id+'\')">'+(isSelc(c)?'Sí':'No')+'</span></td>';
     p.fields.forEach(f=> r+=cellHtml(c,f));
     r+=summaryHtml(c);
     r+='<td style="white-space:nowrap"><button class="row-btn" title="Editar" onclick="openEdit(\''+c.id+'\')">✎</button><button class="row-btn" title="Duplicar" onclick="duplicate(\''+c.id+'\')">⧉</button><button class="row-btn" title="Eliminar" onclick="removeOne(\''+c.id+'\')">🗑</button></td></tr>';
@@ -897,15 +909,15 @@ function cardHtml(c,p,rcField){
   if(rcField){ let rv=valOf(c,rcField); if(Array.isArray(rv))rv=rv[0]; const col=(rcField.colors||{})[rv]; if(col)st=' style="background:'+hexA(col,0.13)+'"'; }
   const tf=p.fields.find(f=>f.primary);
   const title=tf?(valOf(c,tf)||'(sin título)'):'(sin título)';
-  let h='<div class="card-c"'+st+' ondblclick="openEdit(\''+c.id+'\')">';
-  h+='<div class="card-head"><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onclick="event.stopPropagation()" ondblclick="event.stopPropagation()" onchange="toggleSel(\''+c.id+'\',this)"><span class="card-title"><span class="card-num">ID '+(c.num??'')+'</span> '+tok(title)+(p.useCardNum&&c.cardNum!=null?' <span class="icon-tag" title="N° de carta">Carta '+c.cardNum+'</span>':'')+'</span><span class="card-acts" ondblclick="event.stopPropagation()"><button class="row-btn" title="Copiar resumen" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button><button class="row-btn" title="Editar" onclick="event.stopPropagation();openEdit(\''+c.id+'\')">✎</button><button class="row-btn" title="Duplicar" onclick="event.stopPropagation();duplicate(\''+c.id+'\')">⧉</button><button class="row-btn" title="Eliminar" onclick="event.stopPropagation();removeOne(\''+c.id+'\')">🗑</button></span></div>';
+  let h='<div class="card-c'+(isSelc(c)?'':' descartada')+'"'+st+' ondblclick="openEdit(\''+c.id+'\')">';
+  h+='<div class="card-head"><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onclick="event.stopPropagation()" ondblclick="event.stopPropagation()" onchange="toggleSel(\''+c.id+'\',this)"><span class="card-title"><span class="card-num">ID '+(c.num??'')+'</span> '+tok(title)+(p.useCardNum&&c.cardNum!=null?' <span class="icon-tag" title="N° de carta">Carta '+c.cardNum+'</span>':'')+(isSelc(c)?'':' <span class="selpill off" onclick="event.stopPropagation();toggleUso(\''+c.id+'\')" title="Clic para volver a seleccionarla">No seleccionada</span>')+'</span><span class="card-acts" ondblclick="event.stopPropagation()"><button class="row-btn" title="Copiar resumen" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button><button class="row-btn" title="Editar" onclick="event.stopPropagation();openEdit(\''+c.id+'\')">✎</button><button class="row-btn" title="Duplicar" onclick="event.stopPropagation();duplicate(\''+c.id+'\')">⧉</button><button class="row-btn" title="Eliminar" onclick="event.stopPropagation();removeOne(\''+c.id+'\')">🗑</button></span></div>';
   p.fields.forEach(f=>{ if(f===tf||f.inCard===false)return; const miss=missAlert(c,f); const ce=_pm&&_pm[c.id+'|'+f.id]; const vh=miss?'<span class="val-miss">Falta completar</span>':cardValHtml(c,f); if(!miss&&!ce&&(vh===''||vh==null))return; h+='<div class="card-field'+(miss?' miss':'')+(ce?' chg':'')+'">'+(ce?chgBtnHtml(c.id,f.id,ce):'')+'<span class="lbl">'+esc(f.label)+'</span>'+vh+'</div>'; });
   return h+'</div>';
 }
-function colDefault(key){ if(key==='sel')return 34; if(key==='num')return 56; if(key==='cardnum')return 80; if(key==='acc')return 90; if(key==='resumen')return 320; const f=fieldById(key); if(!f)return 150; return ({number:70,check:60,select:140,long:240,abilities:340,icons:150,multiselect:170,list:150})[f.type]||150; }
+function colDefault(key){ if(key==='sel')return 34; if(key==='selc')return 70; if(key==='num')return 56; if(key==='cardnum')return 80; if(key==='acc')return 90; if(key==='resumen')return 320; const f=fieldById(key); if(!f)return 150; return ({number:70,check:60,select:140,long:240,abilities:340,icons:150,multiselect:170,list:150})[f.type]||150; }
 function colWidth(key){ const p=curType(); return (p.colW&&p.colW[key])||colDefault(key); }
-function tableWidth(){ const p=curType(); let s=colWidth('sel')+colWidth('num')+(p.useCardNum?colWidth('cardnum'):0); p.fields.forEach(f=>s+=colWidth(f.id)); return s+colWidth('resumen')+colWidth('acc'); }
-function colgroup(){ const p=curType(); let g='<colgroup><col id="col_sel" style="width:'+colWidth('sel')+'px"><col id="col_num" style="width:'+colWidth('num')+'px">'; if(p.useCardNum)g+='<col id="col_cardnum" style="width:'+colWidth('cardnum')+'px">'; p.fields.forEach(f=>g+='<col id="col_'+f.id+'" style="width:'+colWidth(f.id)+'px">'); g+='<col id="col_resumen" style="width:'+colWidth('resumen')+'px"><col id="col_acc" style="width:'+colWidth('acc')+'px"></colgroup>'; return g; }
+function tableWidth(){ const p=curType(); let s=colWidth('sel')+colWidth('num')+(p.useCardNum?colWidth('cardnum'):0)+colWidth('selc'); p.fields.forEach(f=>s+=colWidth(f.id)); return s+colWidth('resumen')+colWidth('acc'); }
+function colgroup(){ const p=curType(); let g='<colgroup><col id="col_sel" style="width:'+colWidth('sel')+'px"><col id="col_num" style="width:'+colWidth('num')+'px">'; if(p.useCardNum)g+='<col id="col_cardnum" style="width:'+colWidth('cardnum')+'px">'; g+='<col id="col_selc" style="width:'+colWidth('selc')+'px">'; p.fields.forEach(f=>g+='<col id="col_'+f.id+'" style="width:'+colWidth(f.id)+'px">'); g+='<col id="col_resumen" style="width:'+colWidth('resumen')+'px"><col id="col_acc" style="width:'+colWidth('acc')+'px"></colgroup>'; return g; }
 let colDragId=null;
 function colDragStart(e,fid){ if(rz){ e.preventDefault(); return; } colDragId=fid; if(e.dataTransfer){ e.dataTransfer.effectAllowed='move'; try{e.dataTransfer.setData('text/plain',fid);}catch(_){}}}
 function colDragOver(e,fid){ if(!colDragId||colDragId===fid)return; e.preventDefault(); if(e.dataTransfer)e.dataTransfer.dropEffect='move'; e.currentTarget.classList.add('drop-target'); }
@@ -918,7 +930,7 @@ function onResize(e){ if(!rz)return; const p=curType(); if(!p.colW)p.colW={}; co
 function endResize(){ document.removeEventListener('mousemove',onResize); document.removeEventListener('mouseup',endResize); document.body.style.cursor=''; if(rz){ rz=null; save(); } }
 function autoFit(key){
   const table=document.getElementById('compTable'); if(!table)return;
-  const p=curType(); const order=['sel','num']; if(p.useCardNum)order.push('cardnum'); p.fields.forEach(f=>order.push(f.id)); order.push('resumen','acc');
+  const p=curType(); const order=['sel','num']; if(p.useCardNum)order.push('cardnum'); order.push('selc'); p.fields.forEach(f=>order.push(f.id)); order.push('resumen','acc');
   const idx=order.indexOf(key); if(idx<0)return;
   const meas=document.createElement('div');
   meas.style.cssText='position:absolute;visibility:hidden;white-space:nowrap;font-size:13px;left:-9999px;top:0';
@@ -941,7 +953,7 @@ document.addEventListener('dblclick',e=>{
   if(m)autoFit(m[1]);
 });
 function isBlank(v){ return v===''||v===null||v===undefined||(Array.isArray(v)&&v.length===0); }
-function missAlert(c,f){ if(f.alertEmpty===false)return false; if(f.type==='check')return false; if(alertExempt(c,f))return false; return isBlank(valOf(c,f)); }
+function missAlert(c,f){ if(c&&c.descartada)return false; if(f.alertEmpty===false)return false; if(f.type==='check')return false; if(alertExempt(c,f))return false; return isBlank(valOf(c,f)); }
 // Excepciones del aviso de campo vacío: no avisar si otro campo (lista desplegable) tiene ciertos valores. Ej.: no pedir Costo en cartas de mano inicial.
 function alertExempt(c,f){ const ex=f.alertExcept; if(!ex||!ex.field||!Array.isArray(ex.values)||!ex.values.length)return false; const sf=curType().fields.find(x=>x.id===ex.field); if(!sf)return false; const v=valOf(c,sf); return Array.isArray(v)?v.some(x=>ex.values.includes(x)):ex.values.includes(v); }
 let alertExId=null;
@@ -967,7 +979,7 @@ function cellHtmlBase(c,f){
   return '<td class="ec"'+dcEdit+'>'+(f.italic?'<i>'+tok(v)+'</i>':tok(v))+'</td>';
 }
 function abilBlocksHtml(f,v){ return abilSorted(f,v).map(id=>{ const a=(f.library||[]).find(x=>x.id===id); if(!a)return ''; const cls=a.tipo==='Activa'?'act':a.tipo==='Pasiva'?'pas':''; const cc=f.tipoColors&&f.tipoColors[a.tipo]; const st=cc?' style="background:'+cc.bg+';border-left-color:'+cc.fg+';color:'+cc.fg+'"':''; const tst=cc?' style="color:'+cc.fg+'"':''; return '<span class="sum-hab '+cls+'"'+st+'>'+(a.tipo&&a.tipo!=='General'?'<span class="t"'+tst+'>'+esc(a.tipo)+'</span>':'')+'<b>'+tok(a.nombre||'')+'</b>'+(a.texto?': '+tok(a.texto):'')+'</span>'; }).join(''); }
-function summaryText(c){ const t=curType(); const parts=[]; if(t.useCardNum&&c.cardNum!=null) parts.push('N° carta: '+c.cardNum); t.fields.forEach(f=>{ if(f.inSummary===false)return; const val=fieldOut(c,f); if(val!==''&&val!=null) parts.push(f.label+': '+val); }); return parts.join('\n'); }
+function summaryText(c){ const t=curType(); const parts=[]; if(!isSelc(c)) parts.push('NO SELECCIONADA'); if(t.useCardNum&&c.cardNum!=null) parts.push('N° carta: '+c.cardNum); t.fields.forEach(f=>{ if(f.inSummary===false)return; const val=fieldOut(c,f); if(val!==''&&val!=null) parts.push(f.label+': '+val); }); return parts.join('\n'); }
 function summaryHtml(c){
   const t=curType(); const parts=[];
   if(t.useCardNum&&c.cardNum!=null) parts.push('<b>N° carta:</b> '+c.cardNum);
@@ -1353,7 +1365,7 @@ function renderFieldInputs(){
   const t=curType();
   let top='<div class="grid2"><div class="fld"><label class="flabel">ID</label><div style="padding:9px 2px;font-weight:600;color:var(--muted)">'+(editNumVal??'—')+'</div></div>';
   top+=(t.useCardNum?'<div class="fld"><label class="flabel">N° de carta</label><input type="number" value="'+(editCardVal===''?'':editCardVal)+'" oninput="editCardVal=this.value===\'\'?\'\':+this.value"></div>':'<div></div>');
-  top+='</div>';
+  top+='</div><div class="fld"><label style="font-weight:normal;display:inline-flex;gap:8px;align-items:center"><input type="checkbox" style="width:auto" '+(editSelVal?'checked':'')+' onchange="editSelVal=this.checked"> <b>Seleccionada</b> (se usa en el juego)</label></div>';
   document.getElementById('fFields').innerHTML=top+t.fields.map(fieldInputHtml).join('');
 }
 function setVal(id,val){ editValues[id]=val; }
@@ -1364,7 +1376,7 @@ function quickAddAbilityField(id){ const f=fieldById(id); if(!f)return; const t=
 function openEdit(id){
   editingId=(typeof id==='string')?id:null; const c=editingId?curType().components.find(x=>x.id===editingId):null;
   document.getElementById('mEditTitle').textContent=c?'Editar componente':'Agregar componente';
-  editNumVal=c?c.num:nextNum(curType()); editCardVal=(c&&c.cardNum!=null)?c.cardNum:'';
+  editNumVal=c?c.num:nextNum(curType()); editCardVal=(c&&c.cardNum!=null)?c.cardNum:''; editSelVal=c?isSelc(c):true;
   editValues={};
   curType().fields.forEach(f=>{ const v=c?c.values[f.id]:undefined;
     if(f.type==='icons'){ const m={}; (Array.isArray(v)?v:[]).forEach(x=>m[x.tipo]=x.cantidad); editValues[f.id]=m; }
@@ -1382,8 +1394,8 @@ function saveEdit(){
     if(f.type==='abilities'){ const arr=(Array.isArray(v)?v:[]).filter(id=>(f.library||[]).some(a=>a.id===id)); if(arr.length)values[f.id]=arr; return; }
     if(v===undefined||v===''||v===null)return; if(Array.isArray(v)&&!v.length)return; values[f.id]=v;
   });
-  if(editingId){ const c=p.components.find(x=>x.id===editingId); c.values=values; if(editNumVal!=null&&editNumVal!=='')c.num=+editNumVal; if(p.useCardNum){ if(editCardVal===''||editCardVal==null)delete c.cardNum; else c.cardNum=+editCardVal; } toast('Componente actualizado'); }
-  else { const nc={id:uid(),num:(editNumVal!=null&&editNumVal!=='')?+editNumVal:nextNum(p),values}; if(p.useCardNum&&editCardVal!==''&&editCardVal!=null)nc.cardNum=+editCardVal; p.components.push(nc); toast('Componente agregado'); }
+  if(editingId){ const c=p.components.find(x=>x.id===editingId); c.values=values; if(editSelVal)delete c.descartada; else c.descartada=true; if(editNumVal!=null&&editNumVal!=='')c.num=+editNumVal; if(p.useCardNum){ if(editCardVal===''||editCardVal==null)delete c.cardNum; else c.cardNum=+editCardVal; } toast('Componente actualizado'); }
+  else { const nc={id:uid(),num:(editNumVal!=null&&editNumVal!=='')?+editNumVal:nextNum(p),values}; if(p.useCardNum&&editCardVal!==''&&editCardVal!=null)nc.cardNum=+editCardVal; if(!editSelVal)nc.descartada=true; p.components.push(nc); toast('Componente agregado'); }
   save(); render(); closeEdit();
 }
 function duplicate(id){ const p=curType(); const c=p.components.find(x=>x.id===id); const pf=primaryField(); const nv=JSON.parse(JSON.stringify(c.values||{})); if(pf)nv[pf.id]=(nv[pf.id]||'')+' (copia)'; const nc={id:uid(),num:nextNum(p),values:nv}; if(p.useCardNum&&c.cardNum!=null)nc.cardNum=nextCardNum(p); p.components.splice(p.components.indexOf(c)+1,0,nc); save(); render(); }
@@ -1554,7 +1566,7 @@ function saveBulkAdd(){
 function openBulkEdit(){
   if(!selected.size)return; const p=curType();
   const editable=p.fields.filter(f=>f.type!=='abilities'&&f.type!=='icons'&&f.type!=='calc');
-  document.getElementById('beField').innerHTML='<option value="">— No cambiar campo —</option>'+editable.map(f=>'<option value="'+f.id+'">'+esc(f.label)+'</option>').join('');
+  document.getElementById('beField').innerHTML='<option value="">— No cambiar campo —</option><option value="_selc">Seleccionada (sí / no)</option>'+editable.map(f=>'<option value="'+f.id+'">'+esc(f.label)+'</option>').join('');
   renderBulkValue();
   // add/quitar habilidad: opciones de todos los campos de habilidades
   let habOpts='<option value="">— Ninguna —</option>';
@@ -1566,6 +1578,7 @@ function openBulkEdit(){
 }
 function renderBulkValue(){
   const f=fieldById(document.getElementById('beField').value); const box=document.getElementById('beValueWrap');
+  if(document.getElementById('beField').value==='_selc'){ box.innerHTML='<label>Marcar los componentes elegidos como</label><select id="beSelc"><option value="si">Seleccionados</option><option value="no">No seleccionados</option></select>'; return; }
   if(!f){ box.innerHTML=''; return; }
   if(f.type==='number'){ box.innerHTML='<label>Modo</label><select id="beNumMode" onchange="toggleNumMode()"><option value="fijo">Mismo valor para todos</option><option value="seq">Secuencial (en orden de selección)</option></select><div id="beFijoWrap"><label>Nuevo valor</label><input type="number" id="beValue"></div><div id="beSeqWrap" style="display:none"><div class="grid2"><div><label>Inicio</label><input type="number" id="beStart" value="1"></div><div><label>Paso</label><input type="number" id="beStep" value="1"></div></div><p class="hint">Se asigna en el orden en que marcaste las casillas.</p></div>'; return; }
   let inp;
@@ -1579,6 +1592,7 @@ function toggleNumMode(){ const seq=document.getElementById('beNumMode').value==
 function saveBulkEdit(){
   const p=curType(); const f=fieldById(document.getElementById('beField').value);
   const byId=id=>p.components.find(c=>c.id===id); const order=[...selected];
+  if(document.getElementById('beField').value==='_selc'){ const on=document.getElementById('beSelc').value==='si'; order.forEach(id=>{ const c=byId(id); if(!c)return; if(on)delete c.descartada; else c.descartada=true; }); }
   let seqMode=false,start=0,step=1;
   if(f&&f.type==='number'){ const mEl=document.getElementById('beNumMode'); if(mEl&&mEl.value==='seq'){ seqMode=true; start=+document.getElementById('beStart').value||0; step=+document.getElementById('beStep').value||1; } }
   if(f&&seqMode){ order.forEach((id,idx)=>{ const c=byId(id); if(c)c.values[f.id]=start+idx*step; }); }
@@ -1704,8 +1718,8 @@ function sheetName(base, used){
   used.add(x.toLowerCase()); return x;
 }
 function typeToAOA(t){
-  const header=t.fields.map(f=>f.label);
-  const rows=t.components.map(c=>t.fields.map(f=> f.type==='number' ? (valOf(c,f)===''||valOf(c,f)===undefined?'':Number(valOf(c,f))) : fieldOut(c,f) ));
+  const header=['Seleccionada',...t.fields.map(f=>f.label)];
+  const rows=t.components.map(c=>[isSelc(c)?'Sí':'No'].concat(t.fields.map(f=> f.type==='number' ? (valOf(c,f)===''||valOf(c,f)===undefined?'':Number(valOf(c,f))) : fieldOut(c,f) )));
   return [header, ...rows];
 }
 function xlsxExport(){
