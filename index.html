@@ -222,9 +222,14 @@
   body, button, input, select, textarea{font-family:'Plus Jakarta Sans','Segoe UI',system-ui,sans-serif;}
   aside{background:#2B2622; color:#D8D0C6; border-right:none; padding:18px 12px;}
   .famorder{display:flex; flex-direction:column; gap:4px;}
+  .modal .famorder .fo input{flex:1; min-width:0; border:none; background:transparent; font:inherit; padding:2px 0; outline:none;}
+  .famorder .fo .fotag{font-size:11px; color:var(--muted); font-weight:600; white-space:nowrap;}
+  .famopt{display:flex; flex-direction:column; gap:4px; text-align:left; width:100%; padding:14px 16px; border:1px solid var(--line); border-radius:12px; background:#fff; cursor:pointer; margin-top:10px; font:inherit; color:var(--ink);}
+  .famopt:hover{border-color:var(--game); background:var(--gray-soft);}
+  .famopt span{font-size:13px; color:var(--muted);}
   .famorder .fo{display:flex; align-items:center; gap:8px; padding:7px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px;}
   .famorder .fo.me{border-color:var(--game); background:var(--gray-soft); font-weight:700;}
-  .famorder .fo span{flex:1;}
+  .famorder .fo > span:not(.fotag){flex:1;}
   .famorder .fo button{border:1px solid var(--line); background:#fff; border-radius:6px; width:28px; height:26px; cursor:pointer;}
   .famorder .fo button:disabled{opacity:.35; cursor:default;}
   .modal label.chk{display:flex; gap:8px; align-items:flex-start; font-weight:500; color:var(--ink); font-size:13px; line-height:1.4; margin-top:14px;}
@@ -494,18 +499,29 @@
 </div>
 
 <div class="overlay" id="mFamily">
-  <div class="modal" style="width:520px">
+  <div class="modal" style="width:540px">
     <h3>Familia del juego</h3>
-    <p class="hint">Un juego base y sus expansiones o versiones forman una familia. En la lista de juegos aparecen juntos, bajo el nombre de la familia.</p>
-    <label>¿Es parte de otro juego?</label>
-    <select id="famParent" onchange="famParentChanged()"></select>
-    <div id="famBlock">
-      <label>Cómo se llama este juego dentro de la familia</label>
-      <input type="text" id="famShort" placeholder="ej. Juego base, Expansión 2026" oninput="renderFamOrder()">
-      <label>Orden en la lista</label>
-      <div id="famOrder" class="famorder"></div>
+    <p class="hint">Un juego base y sus expansiones o versiones forman una familia: en la lista de juegos aparecen juntos.</p>
+    <div id="famChoose">
+      <button type="button" class="famopt" onclick="famConvert()"><b>Convertir en familia</b><span id="famConvHint"></span></button>
+      <button type="button" class="famopt" onclick="famJoinMode()"><b>Sumarlo a otra familia</b><span>Este juego es una expansión o versión de otro juego que ya está en la app.</span></button>
     </div>
-    <div class="modal-actions"><span class="spacer"></span><button class="btn ghost" onclick="closeModal('mFamily')">Cancelar</button><button class="btn primary" onclick="saveFamily()">Guardar</button></div>
+    <div id="famEdit">
+      <label>Nombre de la familia</label>
+      <input type="text" id="famName">
+      <label>Juegos de la familia</label>
+      <div id="famOrder" class="famorder"></div>
+      <button type="button" class="btn ghost" onclick="famAddNew()" style="margin-top:8px">+ Agregar juego a la familia</button>
+      <p class="hint" id="famNewHint">Los juegos nuevos se crean con el nombre de la familia más su nombre corto, por ejemplo «ILAN Mini expansión».</p>
+      <label class="chk" id="famCopyWrap"><input type="checkbox" id="famCopy" checked> Los juegos nuevos usan los mismos tipos de componente, campos, íconos y habilidades del primero de la lista (sin copiar las cartas)</label>
+    </div>
+    <div id="famJoin">
+      <label>¿De qué juego es parte?</label>
+      <select id="famParent"></select>
+      <label>Cómo se llama este juego dentro de la familia</label>
+      <input type="text" id="famShort" placeholder="ej. Expansión 2026">
+    </div>
+    <div class="modal-actions"><button class="btn ghost" id="famLeave" onclick="clearFamily()">Sacar este juego de la familia</button><span class="spacer"></span><button class="btn ghost" onclick="closeModal('mFamily')">Cancelar</button><button class="btn primary" id="famSave" onclick="saveFamily()">Guardar</button></div>
   </div>
 </div>
 
@@ -981,11 +997,23 @@ function famSelectHtml(selfId,sel){ let h='<option value="">No, es un juego inde
 function famTarget(v,selfId){ if(!v)return []; if(v.startsWith('f:'))return famMembers(v.slice(2)).filter(x=>x.id!==selfId); const g=state.projects.find(x=>x.id===v.slice(2)); return g?[g]:[]; }
 function famNameOf(v){ if(v.startsWith('f:'))return v.slice(2); const g=state.projects.find(x=>x.id===v.slice(2)); return g?((g.familia||'').trim()||g.name):''; }
 function applyFamily(order,name,p,short){ order.forEach((x,i)=>{ x.familia=name; x.familiaOrden=i; if(x!==p&&!x.familiaCorto)x.familiaCorto=(i===0?'Juego base':x.name); }); if(short)p.familiaCorto=short; else p.familiaCorto=p.name; }
-function openFamily(){ const p=proj(); const f=(p.familia||'').trim(); const inFam=f&&famMembers(f).length>1; const sel=inFam?'f:'+f:''; document.getElementById('famParent').innerHTML=famSelectHtml(p.id,sel); document.getElementById('famShort').value=inFam?(p.familiaCorto||''):''; famParentChanged(true); openModal('mFamily'); }
-function famParentChanged(keep){ const p=proj(); const v=document.getElementById('famParent').value; document.getElementById('famBlock').style.display=v?'':'none'; if(!v){ famDraft=[]; return; } const sh=document.getElementById('famShort'); if(!sh.value)sh.value=p.name; const others=famSorted(famTarget(v,p.id)); if(keep===true&&famMembers(p.familia).some(x=>x.id===p.id)&&v==='f:'+(p.familia||'').trim()) famDraft=famSorted(famMembers(p.familia)).map(x=>x.id); else famDraft=others.map(x=>x.id).concat([p.id]); renderFamOrder(); }
-function renderFamOrder(){ const p=proj(); const el=document.getElementById('famOrder'); if(!el)return; const sh=document.getElementById('famShort').value.trim(); el.innerHTML=famDraft.map((id,i)=>{ const x=state.projects.find(y=>y.id===id); const me=id===p.id; const nm=me?(sh||p.name)+' (este juego)':(x.familiaCorto||x.name); return '<div class="fo'+(me?' me':'')+'"><span>'+(i+1)+'. '+esc(nm)+'</span><button type="button" onclick="famMove('+i+',-1)" '+(i===0?'disabled':'')+' aria-label="Subir">↑</button><button type="button" onclick="famMove('+i+',1)" '+(i===famDraft.length-1?'disabled':'')+' aria-label="Bajar">↓</button></div>'; }).join(''); }
+let famMode='choose';
+function openFamily(){ const p=proj(); const f=(p.familia||'').trim(); if(f&&famMembers(f).length>1){ famMode='family'; document.getElementById('famName').value=f; famDraft=famSorted(famMembers(f)).map(x=>({id:x.id, short:x.familiaCorto||x.name})); } else { famMode='choose'; document.getElementById('famConvHint').textContent=p.name+' pasa a ser el juego base y le puedes agregar expansiones.'; } renderFam(); openModal('mFamily'); }
+function renderFam(){ const p=proj(); const show=(id,v)=>document.getElementById(id).style.display=v?'':'none'; show('famChoose',famMode==='choose'); show('famEdit',famMode==='family'); show('famJoin',famMode==='join'); show('famSave',famMode!=='choose'); show('famLeave',famMode==='family'&&famMembers(p.familia).some(x=>x.id===p.id)&&famMembers(p.familia).length>1); if(famMode==='family')renderFamOrder(); }
+function famConvert(){ const p=proj(); famMode='family'; document.getElementById('famName').value=p.name; famDraft=[{id:p.id, short:'Juego base'}]; renderFam(); famAddNew(); }
+function famJoinMode(){ const p=proj(); famMode='join'; const sel=document.getElementById('famParent'); sel.innerHTML=famSelectHtml(p.id,''); sel.remove(0); document.getElementById('famShort').value=p.name; renderFam(); }
+function famAddNew(){ famDraft.push({isNew:true, short:'Expansión'}); renderFamOrder(); const ins=document.querySelectorAll('#famOrder input'); const last=ins[ins.length-1]; if(last){ last.focus(); last.select(); } }
+function renderFamOrder(){ const p=proj(); const el=document.getElementById('famOrder'); el.innerHTML=famDraft.map((r,i)=>{ const me=r.id===p.id; return '<div class="fo'+(me?' me':'')+'"><input type="text" value="'+esc(r.short)+'" oninput="famDraft['+i+'].short=this.value" aria-label="Nombre dentro de la familia">'+((me||r.isNew)?'<span class="fotag">'+(me?'este juego':'nuevo')+'</span>':'')+'<button type="button" onclick="famMove('+i+',-1)" '+(i===0?'disabled':'')+' aria-label="Subir">↑</button><button type="button" onclick="famMove('+i+',1)" '+(i===famDraft.length-1?'disabled':'')+' aria-label="Bajar">↓</button>'+(r.isNew?'<button type="button" onclick="famDel('+i+')" aria-label="Quitar">✕</button>':'')+'</div>'; }).join(''); const anyNew=famDraft.some(r=>r.isNew); document.getElementById('famCopyWrap').style.display=anyNew?'':'none'; document.getElementById('famNewHint').style.display=anyNew?'':'none'; }
 function famMove(i,d){ const j=i+d; if(j<0||j>=famDraft.length)return; [famDraft[i],famDraft[j]]=[famDraft[j],famDraft[i]]; renderFamOrder(); }
-function saveFamily(){ const p=proj(); const v=document.getElementById('famParent').value; if(!v){ clearFamily(); return; } const name=famNameOf(v); if(!name)return; if((p.familia||'').trim()&&(p.familia||'').trim().toLowerCase()!==name.toLowerCase()){ delete p.familia; delete p.familiaOrden; } const order=famDraft.map(id=>state.projects.find(x=>x.id===id)).filter(Boolean); applyFamily(order,name,p,document.getElementById('famShort').value.trim()); closeModal('mFamily'); save(); render(); toast('Familia guardada'); }
+function famDel(i){ famDraft.splice(i,1); renderFamOrder(); }
+function saveFamily(){ const p=proj();
+  if(famMode==='join'){ const v=document.getElementById('famParent').value; if(!v)return; const name=famNameOf(v); if((p.familia||'').trim().toLowerCase()!==name.toLowerCase()){ delete p.familia; delete p.familiaOrden; } applyFamily(famSorted(famTarget(v,p.id)).concat([p]),name,p,document.getElementById('famShort').value.trim()); closeModal('mFamily'); save(); render(); toast('Juego sumado a la familia '+name); return; }
+  if(famMode!=='family')return;
+  const name=document.getElementById('famName').value.trim()||p.name; const old=(p.familia||'').trim();
+  if(old&&old.toLowerCase()!==name.toLowerCase()) famMembers(old).forEach(x=>{ x.familia=name; });
+  const base=famDraft.filter(r=>!r.isNew).map(r=>state.projects.find(x=>x.id===r.id))[0]||p; const copy=document.getElementById('famCopy').checked; let created=0;
+  famDraft.forEach((r,i)=>{ let x; if(r.isNew){ const sh=(r.short||'').trim()||'Expansión'; x=newProject(name+' '+sh); if(copy)cloneStructure(base,x); else if(base.color)x.color=base.color; state.projects.push(x); created++; } else x=state.projects.find(y=>y.id===r.id); if(!x)return; x.familia=name; x.familiaOrden=i; x.familiaCorto=(r.short||'').trim()||x.name; });
+  closeModal('mFamily'); save(); render(); toast(created?'Familia guardada, '+created+(created===1?' juego nuevo':' juegos nuevos'):'Familia guardada'); }
 function clearFamily(){ const p=proj(); const wasIn=famMembers(p.familia).length>1; if(!wasIn){ delete p.familia; delete p.familiaCorto; delete p.familiaOrden; closeModal('mFamily'); save(); render(); return; } delete p.familia; delete p.familiaCorto; delete p.familiaOrden; closeModal('mFamily'); save(); render(); toast('El juego ya no está en una familia'); }
 function setGameColor(c){ proj().color=c; save(); render(); }
 // Si el color del juego no se lee bien con texto blanco (menos de 4,5:1), se oscurece para el encabezado y los botones; el color guardado no cambia.
