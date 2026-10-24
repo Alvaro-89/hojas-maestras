@@ -225,7 +225,7 @@
   .brand-name{font-weight:800; font-size:15px; letter-spacing:.2px;}
   aside h1{color:#9fb8a9; font-size:11px; letter-spacing:1px;}
   .proj{color:#e4ede7; justify-content:flex-start;}
-  .proj>span:first-of-type{flex:1;}
+  .proj .pname{flex:1;}
   .proj:hover{background:rgba(255,255,255,.07);}
   .proj.active{background:rgba(255,255,255,.13); color:#ffffff; font-weight:700;}
   .proj .count{color:#9fb8a9;}
@@ -248,7 +248,9 @@
   .top .row-btn{color:#ffffff; opacity:.85;}
   .top .viewtab{border-color:rgba(255,255,255,.35); color:#ffffff; background:transparent;}
   .top .viewtab.active{background:#ffffff; color:var(--game); border-color:#ffffff;}
-  #gameColor{width:34px; height:30px; border:2px solid rgba(255,255,255,.6); border-radius:8px; padding:0; background:none; cursor:pointer;}
+  .colorbtn{position:relative; display:inline-flex; align-items:center; gap:7px; cursor:pointer;}
+  .colorbtn .sw{width:14px; height:14px; border-radius:4px; background:var(--game); box-shadow:0 0 0 2px #ffffff;}
+  .colorbtn input{position:absolute; inset:0; opacity:0; width:100%; height:100%; cursor:pointer; border:none; padding:0;}
   .stat-tiles{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; padding:14px 24px 0;}
   .stat-tile{background:#ffffff; border:1px solid var(--line); border-radius:14px; padding:12px 16px; display:flex; flex-direction:column; gap:2px;}
   .stat-tile .l{font-size:12px; color:var(--muted); font-weight:600;}
@@ -305,10 +307,10 @@
   <main>
     <div class="top">
       <div class="top-row">
-        <input type="color" id="gameColor" title="Color de este juego" onchange="setGameColor(this.value)">
         <h2 id="projTitle" title="Clic para renombrar" onclick="renameProject()"></h2>
         <span class="stats" id="stats"></span>
         <span class="spacer"></span>
+        <label class="btn ghost colorbtn" title="Elegir el color de este juego"><span class="sw"></span>Color<input type="color" id="gameColor" onchange="setGameColor(this.value)"></label>
         <button class="btn ghost" id="chgBtn" onclick="openChanges()" title="Cambios pendientes de implementar en las cartas reales">Cambios</button>
         <button class="btn ghost" id="undoBtn" onclick="undoChange()" disabled title="Deshacer último cambio (Ctrl+Z)">↩ Deshacer</button>
         <button class="btn ghost" id="redoBtn" onclick="redoChange()" disabled title="Rehacer (Ctrl+Y)">↪ Rehacer</button>
@@ -923,7 +925,7 @@ function renderStats(p){ const box=document.getElementById('statTiles'); if(!box
 function render(){
   const p=proj();
   applyTheme(p);
-  document.getElementById('projectList').innerHTML=state.projects.map(x=>'<div class="proj '+(x.id===p.id?'active':'')+'" onclick="switchProject(\''+x.id+'\')"><span class="gdot" style="background:'+gameColor(x)+'"></span><span>'+esc(x.name)+'</span><span class="count">'+x.types.reduce((s,t)=>s+t.components.length,0)+(chgCount(x)?'<span class="pend" title="Cambios pendientes de implementar">'+chgCount(x)+'</span>':'')+'</span></div>').join('');
+  document.getElementById('projectList').innerHTML=state.projects.map(x=>'<div class="proj '+(x.id===p.id?'active':'')+'" onclick="switchProject(\''+x.id+'\')"><span class="gdot" style="background:'+gameColor(x)+'"></span><span class="pname">'+esc(x.name)+'</span><span class="count">'+x.types.reduce((s,t)=>s+t.components.length,0)+(chgCount(x)?'<span class="pend" title="Cambios pendientes de implementar">'+chgCount(x)+'</span>':'')+'</span></div>').join('');
   document.getElementById('projTitle').textContent=p.name;
   { const n=chgCount(p), b=document.getElementById('chgBtn'); if(b){ b.textContent=n?('Cambios pendientes ('+n+')'):'Cambios'; b.classList.toggle('has',!!n); } }
   renderNav();
