@@ -226,6 +226,12 @@
   aside h1{color:#9fb8a9; font-size:11px; letter-spacing:1px;}
   .proj{color:#e4ede7; justify-content:flex-start;}
   .proj .pname{flex:1;}
+  .fam{background:rgba(255,255,255,.05); border-radius:12px; padding:6px; margin-bottom:6px;}
+  .fam-head{display:flex; align-items:center; gap:8px; padding:4px 6px 6px;}
+  .fam-name{flex:1; font-weight:800; font-size:12px; letter-spacing:.6px; text-transform:uppercase; color:#cfe3d6;}
+  .fam-n{font-size:11px; color:#9fb8a9;}
+  .fam .proj{padding-left:24px; margin-bottom:1px;}
+  .famrow{display:grid; grid-template-columns:1fr; gap:4px;}
   .proj:hover{background:rgba(255,255,255,.07);}
   .proj.active{background:rgba(255,255,255,.13); color:#ffffff; font-weight:700;}
   .proj .count{color:#9fb8a9;}
@@ -311,6 +317,7 @@
         <h2 id="projTitle" title="Clic para renombrar" onclick="renameProject()"></h2>
         <span class="stats" id="stats"></span>
         <span class="spacer"></span>
+        <button class="btn ghost" onclick="openFamily()" title="Agrupar este juego con otros relacionados (ej. juego base y expansión)">Familia</button>
         <label class="btn ghost colorbtn" title="Elegir el color de este juego"><span class="sw"></span>Color<input type="color" id="gameColor" onchange="setGameColor(this.value)"></label>
         <button class="btn ghost" id="chgBtn" onclick="openChanges()" title="Cambios pendientes de implementar en las cartas reales">Cambios</button>
         <button class="btn ghost" id="undoBtn" onclick="undoChange()" disabled title="Deshacer último cambio (Ctrl+Z)">↩ Deshacer</button>
@@ -477,6 +484,20 @@
   </div>
 </div>
 
+<div class="overlay" id="mFamily">
+  <div class="modal">
+    <h3>Familia del juego</h3>
+    <p class="hint">Los juegos con el mismo nombre de familia aparecen juntos en la lista de juegos, por ejemplo un juego base y su expansión.</p>
+    <label>Nombre de la familia</label>
+    <input type="text" id="famName" list="famList" placeholder="ej. Kurrüf">
+    <datalist id="famList"></datalist>
+    <label>Cómo se llama este juego dentro de la familia</label>
+    <input type="text" id="famShort" placeholder="ej. Juego base, Expansión 2026">
+    <label>Posición dentro de la familia</label>
+    <input type="number" id="famOrder" placeholder="1 = primero" min="1">
+    <div class="modal-actions"><button class="btn ghost" onclick="clearFamily()">Quitar de la familia</button><span class="spacer"></span><button class="btn ghost" onclick="closeModal('mFamily')">Cancelar</button><button class="btn primary" onclick="saveFamily()">Guardar</button></div>
+  </div>
+</div>
 <div class="overlay" id="mAlertEx">
   <div class="modal">
     <h3 id="mAlertExTitle">Excepciones del aviso</h3>
@@ -918,6 +939,12 @@ function clearFiltros(){ filterState={}; sortKey=null; sortDir=1; const s=docume
 /* ---------- Render ---------- */
 const GAME_COLORS=['#2f7d4f','#c05621','#2b5d9a','#6a3d8f','#9a6a12','#1f6f74','#a3374f'];
 function gameColor(x){ if(x&&x.color)return x.color; const i=Math.max(0,state.projects.indexOf(x)); return GAME_COLORS[i%GAME_COLORS.length]; }
+// Familias de juegos: p.familia (nombre del grupo), p.familiaCorto (nombre dentro del grupo), p.familiaOrden (posición).
+function projItemHtml(x,p,inFam){ return '<div class="proj '+(x.id===p.id?'active':'')+'" onclick="switchProject(\''+x.id+'\')" title="'+esc(x.name)+'">'+(inFam?'':'<span class="gdot" style="background:'+gameColor(x)+'"></span>')+'<span class="pname">'+esc(inFam&&x.familiaCorto?x.familiaCorto:x.name)+'</span><span class="count">'+x.types.reduce((s,t)=>s+t.components.length,0)+(chgCount(x)?'<span class="pend" title="Cambios pendientes de implementar">'+chgCount(x)+'</span>':'')+'</span></div>'; }
+function projectListHtml(p){ const seen=new Set(); let h=''; state.projects.forEach(x=>{ if(seen.has(x.id))return; const fam=(x.familia||'').trim(); const members=fam?state.projects.filter(y=>(y.familia||'').trim().toLowerCase()===fam.toLowerCase()):[x]; if(members.length<2){ seen.add(x.id); h+=projItemHtml(x,p,false); return; } members.sort((a,b)=>((a.familiaOrden??99)-(b.familiaOrden??99))||(state.projects.indexOf(a)-state.projects.indexOf(b))); members.forEach(m=>seen.add(m.id)); h+='<div class="fam"><div class="fam-head"><span class="gdot" style="background:'+gameColor(members[0])+'"></span><span class="fam-name">'+esc(fam)+'</span><span class="fam-n">'+members.length+' juegos</span></div>'+members.map(m=>projItemHtml(m,p,true)).join('')+'</div>'; }); return h; }
+function openFamily(){ const p=proj(); document.getElementById('famName').value=p.familia||''; document.getElementById('famShort').value=p.familiaCorto||''; document.getElementById('famOrder').value=(p.familiaOrden!=null?p.familiaOrden+1:''); document.getElementById('famList').innerHTML=[...new Set(state.projects.map(x=>x.familia).filter(Boolean))].map(f=>'<option value="'+esc(f)+'">').join(''); openModal('mFamily'); }
+function saveFamily(){ const p=proj(); const f=document.getElementById('famName').value.trim(); const sh=document.getElementById('famShort').value.trim(); const o=document.getElementById('famOrder').value; if(!f){ clearFamily(); return; } p.familia=f; if(sh)p.familiaCorto=sh; else delete p.familiaCorto; if(o!=='')p.familiaOrden=Math.max(0,(+o)-1); else delete p.familiaOrden; closeModal('mFamily'); save(); render(); toast('Familia guardada'); }
+function clearFamily(){ const p=proj(); delete p.familia; delete p.familiaCorto; delete p.familiaOrden; closeModal('mFamily'); save(); render(); toast('El juego ya no está en una familia'); }
 function setGameColor(c){ proj().color=c; save(); render(); }
 // Si el color del juego no se lee bien con texto blanco (menos de 4,5:1), se oscurece para el encabezado y los botones; el color guardado no cambia.
 function lumOf(hex){ hex=String(hex).replace('#',''); if(hex.length===3)hex=hex.split('').map(x=>x+x).join(''); const ch=[0,2,4].map(i=>{ const v=parseInt(hex.slice(i,i+2),16)/255; return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4); }); return 0.2126*ch[0]+0.7152*ch[1]+0.0722*ch[2]; }
@@ -929,7 +956,7 @@ function renderStats(p){ const box=document.getElementById('statTiles'); if(!box
 function render(){
   const p=proj();
   applyTheme(p);
-  document.getElementById('projectList').innerHTML=state.projects.map(x=>'<div class="proj '+(x.id===p.id?'active':'')+'" onclick="switchProject(\''+x.id+'\')"><span class="gdot" style="background:'+gameColor(x)+'"></span><span class="pname">'+esc(x.name)+'</span><span class="count">'+x.types.reduce((s,t)=>s+t.components.length,0)+(chgCount(x)?'<span class="pend" title="Cambios pendientes de implementar">'+chgCount(x)+'</span>':'')+'</span></div>').join('');
+  document.getElementById('projectList').innerHTML=projectListHtml(p);
   document.getElementById('projTitle').textContent=p.name;
   { const n=chgCount(p), b=document.getElementById('chgBtn'); if(b){ b.textContent=n?('Cambios pendientes ('+n+')'):'Cambios'; b.classList.toggle('has',!!n); } }
   renderNav();
