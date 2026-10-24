@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hojas Maestras — Within Play</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#f4f2ec; --panel:#ffffff; --ink:#2b2a26; --muted:#8a8578;
@@ -214,6 +216,63 @@
   .tok-ac-hint{padding:5px 10px; font-size:11px; color:var(--muted); border-top:1px solid var(--line);}
   .tok-ac-new{color:var(--accent); font-weight:600;}
   #mTokens{z-index:12;}
+  /* ===== Tema 2026-10: estilo "Bosque" + color por juego ===== */
+  :root{ --bg:#f4f6f3; --line:#dfe5df; --ink:#1d2a24; --muted:#5f6f66; --gray-soft:#eef1ee; --game:#2f7d4f; }
+  body, button, input, select, textarea{font-family:'Plus Jakarta Sans','Segoe UI',system-ui,sans-serif;}
+  aside{background:#17352a; color:#e4ede7; border-right:none; padding:18px 12px;}
+  .brand{display:flex; align-items:center; gap:10px; padding:0 6px 16px;}
+  .brand-logo{width:30px; height:30px; border-radius:8px; background:#f1af38; color:#17352a; display:flex; align-items:center; justify-content:center; font-weight:800;}
+  .brand-name{font-weight:800; font-size:15px; letter-spacing:.2px;}
+  aside h1{color:#9fb8a9; font-size:11px; letter-spacing:1px;}
+  .proj{color:#e4ede7; justify-content:flex-start;}
+  .proj>span:first-of-type{flex:1;}
+  .proj:hover{background:rgba(255,255,255,.07);}
+  .proj.active{background:rgba(255,255,255,.13); color:#ffffff; font-weight:700;}
+  .proj .count{color:#9fb8a9;}
+  .gdot{width:10px; height:10px; border-radius:50%; flex:none; box-shadow:0 0 0 2px rgba(255,255,255,.15);}
+  .side-btn{border-color:#4d6d5d; color:#c9d9cf;}
+  .side-btn:hover{border-color:#9fd3b3; color:#ffffff;}
+  .side-foot{border-top-color:rgba(255,255,255,.12);}
+  .side-foot button{border-color:#3c5a4c; color:#c9d9cf;}
+  .side-foot button:hover{color:#ffffff; border-color:#9fb8a9;}
+  #syncInfo{color:#9fb8a9;}
+  .top{background:var(--game); color:#ffffff; padding:18px 24px 14px;}
+  .top h2{font-size:26px; font-weight:800; letter-spacing:-.3px;}
+  .top h2:hover::after{color:rgba(255,255,255,.7);}
+  .top .stats{color:rgba(255,255,255,.88);}
+  .top .btn.ghost{background:rgba(255,255,255,.12); color:#ffffff; border:1px solid rgba(255,255,255,.35);}
+  .top .btn.ghost:hover{background:rgba(255,255,255,.2); filter:none;}
+  .top .btn.ghost:disabled{opacity:.45;}
+  .top .btn.danger{color:#ffe0e0;}
+  .top #chgBtn.has{background:#ffffff; color:#b35c0f; border-color:#ffffff;}
+  .top .row-btn{color:#ffffff; opacity:.85;}
+  .top .viewtab{border-color:rgba(255,255,255,.35); color:#ffffff; background:transparent;}
+  .top .viewtab.active{background:#ffffff; color:var(--game); border-color:#ffffff;}
+  #gameColor{width:34px; height:30px; border:2px solid rgba(255,255,255,.6); border-radius:8px; padding:0; background:none; cursor:pointer;}
+  .stat-tiles{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; padding:14px 24px 0;}
+  .stat-tile{background:#ffffff; border:1px solid var(--line); border-radius:14px; padding:12px 16px; display:flex; flex-direction:column; gap:2px;}
+  .stat-tile .l{font-size:12px; color:var(--muted); font-weight:600;}
+  .stat-tile .v{font-size:24px; font-weight:800; line-height:1.2;}
+  .stat-tile .h{font-size:11px; color:var(--muted);}
+  .stat-tile .v.acc{color:var(--game);}
+  .stat-tile .v.warn{color:#b35c0f;}
+  @media (max-width:900px){ .stat-tiles{grid-template-columns:repeat(2,minmax(0,1fr));} }
+  .typechecks{display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:12px 24px 0;}
+  .typechecks .tc-lbl{font-weight:700; color:var(--muted); font-size:13px; margin-right:2px;}
+  .tcheck{display:inline-flex; align-items:center; gap:7px; padding:7px 12px; border-radius:10px; font-weight:700; font-size:13px; cursor:pointer; border:1px solid transparent; user-select:none;}
+  .tcheck input{width:auto; margin:0;}
+  .tcheck.off{background:#ffffff !important; color:var(--muted) !important; border-color:var(--line); text-decoration:line-through;}
+  .tcheck b{font-weight:800; opacity:.75;}
+  .btn.primary{background:var(--game);}
+  .toolbar input[type=text]{border-radius:10px;}
+  table{border-radius:14px;}
+  .selsw{display:inline-flex; width:40px; height:22px; border-radius:999px; padding:2px; border:none; cursor:pointer; background:#cfc7c7; justify-content:flex-start; vertical-align:middle;}
+  .selsw.on{background:var(--game); justify-content:flex-end;}
+  .selsw>span{width:18px; height:18px; border-radius:50%; background:#ffffff; display:block; box-shadow:0 1px 2px rgba(0,0,0,.2);}
+  .difbar{width:120px; height:6px; border-radius:3px; background:#e8ece9; overflow:hidden; margin-bottom:5px;}
+  .difbar>span{display:block; height:6px; border-radius:3px;}
+  .diflbl{font-weight:700; font-size:12px;}
+  .diftxt{font-size:11px; color:var(--muted);}
 </style>
 </head>
 <body>
@@ -231,6 +290,7 @@
 </div>
 <div id="app">
   <aside>
+    <div class="brand"><div class="brand-logo">H</div><div class="brand-name">Hojas Maestras</div></div>
     <h1>Juegos</h1>
     <div id="projectList"></div>
     <button class="side-btn" onclick="addProject()">+ Nuevo juego</button>
@@ -245,16 +305,18 @@
   <main>
     <div class="top">
       <div class="top-row">
+        <input type="color" id="gameColor" title="Color de este juego" onchange="setGameColor(this.value)">
         <h2 id="projTitle" title="Clic para renombrar" onclick="renameProject()"></h2>
         <span class="stats" id="stats"></span>
         <span class="spacer"></span>
         <button class="btn ghost" id="chgBtn" onclick="openChanges()" title="Cambios pendientes de implementar en las cartas reales">Cambios</button>
         <button class="btn ghost" id="undoBtn" onclick="undoChange()" disabled title="Deshacer último cambio (Ctrl+Z)">↩ Deshacer</button>
         <button class="btn ghost" id="redoBtn" onclick="redoChange()" disabled title="Rehacer (Ctrl+Y)">↪ Rehacer</button>
-        <button class="btn ghost" style="color:#a33" onclick="deleteProject()">Eliminar juego</button>
+        <button class="btn ghost danger" onclick="deleteProject()">Eliminar juego</button>
       </div>
       <div id="navBar" class="navbar"></div>
     </div>
+    <div id="statTiles" class="stat-tiles"></div>
 
     <div id="viewTypes" class="view">
       <div class="toolbar"><span class="spacer"></span><button class="btn ghost" onclick="openTokens()">🖼 Iconografía</button><button class="btn ghost" onclick="openExport('project')">Exportar juego ▾</button></div>
@@ -262,6 +324,7 @@
     </div>
 
     <div id="viewComponentes" class="view">
+      <div id="typeChecks" class="typechecks"></div>
       <div class="toolbar">
         <input type="text" id="search" placeholder="Buscar…" oninput="render()">
         <span id="dynFilters"></span>
@@ -497,6 +560,7 @@ const KEY='appComponentesJuegos_v1';
 const FIELD_TYPES={text:'Texto corto', long:'Texto largo', number:'Número', select:'Lista desplegable', check:'Sí / No', list:'Lista de valores', multiselect:'Selección múltiple', abilities:'Habilidades', icons:'Ecosistemas / íconos', calc:'Dificultad (calculada)'};
 // Campo calculado: probabilidad de conseguir el costo, multiplicando la probabilidad de cada ícono (definida en "Configurar íconos").
 function calcVal(c,f){ const t=curType(); const src=t.fields.find(x=>x.id===f.src&&x.type==='icons')||t.fields.find(x=>x.type==='icons'); if(!src)return ''; const v=c.values[src.id]; if(!Array.isArray(v)||!v.length)return ''; let p=1; for(const x of v){ const it=(src.iconSet||[]).find(i=>i.nombre===x.tipo); if(!it||typeof it.prob!=='number'||!(it.prob>0))return ''; p*=Math.pow(it.prob,Math.max(1,parseInt(x.cantidad)||1)); } return p; }
+function difHtml(p){ if(p===''||p==null||isNaN(p)||!(p>0))return ''; const lg=-Math.log10(p); const pct=Math.max(4,Math.min(100,Math.round(lg/9*100))); const lv=lg<3?['Fácil','#3f9a63']:lg<6?['Media','#d08a1f']:['Difícil','#b6334a']; return '<div class="difbar"><span style="width:'+pct+'%;background:'+lv[1]+'"></span></div><div class="diflbl">'+lv[0]+'</div><div class="diftxt">'+esc(fmtProb(p))+'</div>'; }
 function fmtProb(p){ if(p===''||p==null||isNaN(p))return ''; const pct=(p*100).toLocaleString('es-CL',{maximumSignificantDigits:3}); return pct+' % (1 en '+Math.round(1/p).toLocaleString('es-CL')+')'; }
 function parseProb(txt){ let t=String(txt).trim().replace(',','.'); if(!t)return null; if(t.includes('/')){ const [a,b]=t.split('/').map(Number); return (a>0&&b>0)?a/b:null; } if(t.endsWith('%')){ const n=parseFloat(t); return n>0?n/100:null; } const n=parseFloat(t); if(!(n>0))return null; return n>1?n/100:n; }
 const ESTADOS=['Idea','Borrador','En prueba','Final'];
@@ -819,6 +883,9 @@ function fdropLabel(f,opts){ const fs=filterState[f.id]; if(!fs||!fs.sel)return 
 function fdropHtml(f,opts){ const fs=filterState[f.id]; const sel=fs&&fs.sel; const open=openFdrop===f.id; let h='<span class="fdrop" onclick="event.stopPropagation()"><button type="button" class="'+(sel?'on':'')+'" onclick="toggleFdrop(\''+f.id+'\')" title="Desmarca lo que no quieras ver">'+fdropLabel(f,opts)+'</button>';
   if(open){ h+='<div class="fpanel"><div class="fp-acts"><button type="button" class="btn ghost mini" onclick="fdropAll(\''+f.id+'\',true)">Todos</button><button type="button" class="btn ghost mini" onclick="fdropAll(\''+f.id+'\',false)">Ninguno</button></div>'+opts.map((o,i)=>'<div class="fp-row"><label><input type="checkbox" '+(!sel||sel.includes(o[0])?'checked':'')+' onchange="fdropToggle(\''+f.id+'\','+i+',this.checked)"> '+tok(o[1])+'</label><span class="fp-only" onclick="fdropOnly(\''+f.id+'\','+i+')">solo este</span></div>').join('')+'</div>'; }
   return h+'</span> '; }
+// Casillas de color arriba de la lista: usan el primer campo de lista desplegable que tenga colores (ej. Tipo de carta).
+function typeCheckField(t){ return t.fields.find(f=>f.type==='select'&&f.colors&&Object.keys(f.colors).length); }
+function renderTypeChecks(t,f){ const box=document.getElementById('typeChecks'); if(!box)return; if(!f){ box.innerHTML=''; box.style.display='none'; return; } box.style.display=''; const opts=filterOpts(f); const fs=filterState[f.id]; const sel=fs&&fs.sel; box.innerHTML='<span class="tc-lbl">'+esc(f.label)+'</span>'+opts.map((o,i)=>{ const on=!sel||sel.includes(o[0]); const n=t.components.filter(c=>matchFilter(c,f,[o[0]])).length; const col=(f.colors||{})[o[0]]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':' style="background:var(--gray-soft)"'; return '<label class="tcheck'+(on?'':' off')+'"'+st+' title="Mostrar u ocultar"><input type="checkbox" '+(on?'checked':'')+' onchange="fdropToggle(\''+f.id+'\','+i+',this.checked)"> '+tok(o[1])+' <b>'+n+'</b></label>'; }).join('')+(sel?' <button class="btn ghost mini" onclick="fdropAll(\''+f.id+'\',true)">Mostrar todos</button>':''); }
 function toggleFdrop(id){ openFdrop=(openFdrop===id)?null:id; render(); }
 function fdropSet(id,sel){ const f=fieldById(id); const all=filterOpts(f).map(o=>o[0]); if(sel.length===all.length&&all.every(x=>sel.includes(x)))delete filterState[id]; else filterState[id]={sel}; render(); }
 function fdropToggle(id,i,on){ const f=fieldById(id); const opts=filterOpts(f); const cur=filterState[id]&&filterState[id].sel?[...filterState[id].sel]:opts.map(o=>o[0]); const v=opts[i]&&opts[i][0]; if(v===undefined)return; const s=new Set(cur); if(on)s.add(v); else s.delete(v); fdropSet(id,[...s]); }
@@ -846,12 +913,21 @@ function toggleSortDir(){ if(sortKey){ sortDir*=-1; render(); } }
 function clearFiltros(){ filterState={}; sortKey=null; sortDir=1; const s=document.getElementById('search'); if(s)s.value=''; render(); }
 
 /* ---------- Render ---------- */
+const GAME_COLORS=['#2f7d4f','#c05621','#2b5d9a','#6a3d8f','#9a6a12','#1f6f74','#a3374f'];
+function gameColor(x){ if(x&&x.color)return x.color; const i=Math.max(0,state.projects.indexOf(x)); return GAME_COLORS[i%GAME_COLORS.length]; }
+function setGameColor(c){ proj().color=c; save(); render(); }
+function applyTheme(p){ const c=gameColor(p); const r=document.documentElement.style; r.setProperty('--game',c); r.setProperty('--accent',c); r.setProperty('--accent-soft',hexA(c,0.12)); const gi=document.getElementById('gameColor'); if(gi&&gi.value!==c)gi.value=c; }
+function statTile(l,v,h,cls){ return '<div class="stat-tile"><span class="l">'+esc(l)+'</span><span class="v '+(cls||'')+'">'+esc(String(v))+'</span><span class="h">'+esc(h)+'</span></div>'; }
+function renderStats(p){ const box=document.getElementById('statTiles'); if(!box)return; const comps=typeOpened?curType().components:p.types.flatMap(t=>t.components); const desc=comps.filter(c=>c.descartada).length; let miss=0; if(typeOpened){ const t=curType(); t.components.forEach(c=>{ if(t.fields.some(f=>missAlert(c,f)))miss++; }); } const pend=chgCount(p,typeOpened?curType().id:undefined);
+  box.innerHTML=statTile(typeOpened?curType().name:'Componentes',comps.length,typeOpened?(curType().fields.length+' campos'):(p.types.length+' tipo'+(p.types.length===1?'':'s')))+statTile('Seleccionados',comps.length-desc,desc?(desc+' fuera del juego'):'todos en uso','acc')+(typeOpened?statTile('Por completar',miss,miss?'con campos vacíos':'todo al día',miss?'warn':''):statTile('Tipos',p.types.length,'de componente'))+statTile('Cambios pendientes',pend,pend?'sin implementar':'nada pendiente',pend?'warn':''); }
 function render(){
   const p=proj();
-  document.getElementById('projectList').innerHTML=state.projects.map(x=>'<div class="proj '+(x.id===p.id?'active':'')+'" onclick="switchProject(\''+x.id+'\')"><span>'+esc(x.name)+'</span><span class="count">'+x.types.reduce((s,t)=>s+t.components.length,0)+(chgCount(x)?'<span class="pend" title="Cambios pendientes de implementar">'+chgCount(x)+'</span>':'')+'</span></div>').join('');
+  applyTheme(p);
+  document.getElementById('projectList').innerHTML=state.projects.map(x=>'<div class="proj '+(x.id===p.id?'active':'')+'" onclick="switchProject(\''+x.id+'\')"><span class="gdot" style="background:'+gameColor(x)+'"></span><span>'+esc(x.name)+'</span><span class="count">'+x.types.reduce((s,t)=>s+t.components.length,0)+(chgCount(x)?'<span class="pend" title="Cambios pendientes de implementar">'+chgCount(x)+'</span>':'')+'</span></div>').join('');
   document.getElementById('projTitle').textContent=p.name;
   { const n=chgCount(p), b=document.getElementById('chgBtn'); if(b){ b.textContent=n?('Cambios pendientes ('+n+')'):'Cambios'; b.classList.toggle('has',!!n); } }
   renderNav();
+  renderStats(p);
   if(!typeOpened){ showView('viewTypes'); document.getElementById('stats').textContent=p.types.length+' tipo'+(p.types.length===1?'':'s')+' de componente'; renderTypes(); return; }
   const t=curType();
   document.getElementById('stats').textContent=t.components.length+' componentes · '+t.fields.length+' campos';
@@ -881,8 +957,9 @@ function renderComponents(){
   _pm=chgPendMap();
   { const ck=document.getElementById('chkPendOnly'); if(ck)ck.checked=pendOnly; }
   const df=document.getElementById('dynFilters'); df.innerHTML='';
+  const tcf=typeCheckField(p); renderTypeChecks(p,tcf);
   { const cur=filterState._selc||''; df.innerHTML+='<select onchange="setFilter(\'_selc\',this.value)"><option value="">Seleccionada: todas</option><option value="si" '+(cur==='si'?'selected':'')+'>Seleccionada: sí</option><option value="no" '+(cur==='no'?'selected':'')+'>Seleccionada: no</option></select> '; }
-  p.fields.forEach(f=>{ const opts=filterOpts(f); if(!opts.length)return; df.innerHTML+=fdropHtml(f,opts); });
+  p.fields.forEach(f=>{ if(f===tcf)return; const opts=filterOpts(f); if(!opts.length)return; df.innerHTML+=fdropHtml(f,opts); });
   const sb=document.getElementById('sortBox');
   let so='<option value="">Orden: '+(p.useCardNum?'N° de carta':'original')+'</option><option value="_num" '+(sortKey==='_num'?'selected':'')+'>Orden: ID</option>';
   if(p.useCardNum) so+='<option value="_cardnum" '+(sortKey==='_cardnum'?'selected':'')+'>Orden: N° de carta</option>';
@@ -899,7 +976,7 @@ function renderComponents(){
   const rows=list.map(c=>{ let rs=''; if(rcField){ let rv=valOf(c,rcField); if(Array.isArray(rv))rv=rv[0]; const col=(rcField.colors||{})[rv]; if(col)rs=' style="background:'+hexA(col,0.13)+'"'; } let r='<tr'+rs+(isSelc(c)?'':' class="descartada"')+'><td><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onchange="toggleSel(\''+c.id+'\',this)"></td>';
     r+='<td style="color:var(--muted);font-weight:600">'+(c.num??'')+'</td>';
     if(p.useCardNum) r+='<td class="ec" style="color:var(--muted);font-weight:600" ondblclick="editNum(this,\''+c.id+'\',\'cardNum\')">'+(c.cardNum??'')+'</td>';
-    r+='<td><span class="selpill '+(isSelc(c)?'on':'off')+'" title="Clic para cambiar" onclick="toggleUso(\''+c.id+'\')">'+(isSelc(c)?'Sí':'No')+'</span></td>';
+    r+='<td><button type="button" class="selsw '+(isSelc(c)?'on':'off')+'" title="'+(isSelc(c)?'Seleccionada: clic para sacarla del juego':'No seleccionada: clic para volver a usarla')+'" aria-label="Seleccionada" aria-pressed="'+isSelc(c)+'" onclick="toggleUso(\''+c.id+'\')"><span></span></button></td>';
     p.fields.forEach(f=> r+=cellHtml(c,f));
     r+=summaryHtml(c);
     r+='<td style="white-space:nowrap"><button class="row-btn" title="Editar" onclick="openEdit(\''+c.id+'\')">✎</button><button class="row-btn" title="Duplicar" onclick="duplicate(\''+c.id+'\')">⧉</button><button class="row-btn" title="Eliminar" onclick="removeOne(\''+c.id+'\')">🗑</button></td></tr>';
@@ -992,7 +1069,7 @@ function cellHtmlBase(c,f){
   const dcOpen=' ondblclick="openEdit(\''+c.id+'\')"';
   if(f.type==='abilities'){ return '<td class="cell-hab ec"'+dcOpen+'>'+abilBlocksHtml(f,v)+'</td>'; }
   if(f.type==='icons'){ const t=iconsHtml(v); return '<td class="cell-icon ec"'+dcOpen+'>'+t+'</td>'; }
-  if(f.type==='calc') return '<td class="ec" title="Se calcula solo a partir del costo">'+esc(fmtProb(v))+'</td>';
+  if(f.type==='calc') return '<td class="ec" title="Se calcula solo a partir del costo">'+difHtml(v)+'</td>';
   if(f.type==='check') return '<td class="ec"'+dcEdit+'>'+(v?'<span class="yes">✓</span>':'<span class="no">—</span>')+'</td>';
   if(f.type==='long'){ const shown=tok(String(v).length>140?String(v).slice(0,140)+'…':v); return '<td class="long ec"'+dcEdit+' title="'+esc(v)+'">'+(f.italic?'<i>'+shown+'</i>':shown)+'</td>'; }
   if(f.type==='multiselect') return '<td class="ec"'+dcEdit+'>'+(Array.isArray(v)?v:[]).map(x=>{const col=(f.colors||{})[x]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; return '<span class="tag"'+st+'>'+tok(x)+'</span>';}).join('')+'</td>';
