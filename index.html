@@ -396,7 +396,7 @@
   <div class="modal">
     <h3 id="mSetTitle">Ecosistemas</h3>
     <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px"><span class="hint" style="margin:0">Íconos de este campo y cuántas veces puede llevar cada uno una misma carta.</span><span class="spacer"></span><button class="btn primary mini" onclick="addSetIcon()">+ Nuevo ícono</button></div>
-    <table><thead><tr><th class="nosort">Ícono</th><th class="nosort" style="width:140px">Máx. por carta</th><th class="nosort" style="width:90px">Usos</th><th class="nosort" style="width:50px"></th></tr></thead><tbody id="setBody"></tbody></table>
+    <table><thead><tr><th class="nosort">Ícono</th><th class="nosort" style="width:140px">Máx. por carta</th><th class="nosort" style="width:130px" title="Probabilidad de obtener este ícono. Se usa en los campos de Dificultad. Acepta 1/8, 12,5% o 0,125">Probabilidad</th><th class="nosort" style="width:90px">Usos</th><th class="nosort" style="width:50px"></th></tr></thead><tbody id="setBody"></tbody></table>
     <div class="empty" id="setEmpty" style="display:none">Aún no hay íconos.</div>
     <div class="modal-actions"><button class="btn primary" onclick="closeSet()">Cerrar</button></div>
   </div>
@@ -465,7 +465,11 @@
 <script>
 'use strict';
 const KEY='appComponentesJuegos_v1';
-const FIELD_TYPES={text:'Texto corto', long:'Texto largo', number:'Número', select:'Lista desplegable', check:'Sí / No', list:'Lista de valores', multiselect:'Selección múltiple', abilities:'Habilidades', icons:'Ecosistemas / íconos'};
+const FIELD_TYPES={text:'Texto corto', long:'Texto largo', number:'Número', select:'Lista desplegable', check:'Sí / No', list:'Lista de valores', multiselect:'Selección múltiple', abilities:'Habilidades', icons:'Ecosistemas / íconos', calc:'Dificultad (calculada)'};
+// Campo calculado: probabilidad de conseguir el costo, multiplicando la probabilidad de cada ícono (definida en "Configurar íconos").
+function calcVal(c,f){ const t=curType(); const src=t.fields.find(x=>x.id===f.src&&x.type==='icons')||t.fields.find(x=>x.type==='icons'); if(!src)return ''; const v=c.values[src.id]; if(!Array.isArray(v)||!v.length)return ''; let p=1; for(const x of v){ const it=(src.iconSet||[]).find(i=>i.nombre===x.tipo); if(!it||typeof it.prob!=='number'||!(it.prob>0))return ''; p*=Math.pow(it.prob,Math.max(1,parseInt(x.cantidad)||1)); } return p; }
+function fmtProb(p){ if(p===''||p==null||isNaN(p))return ''; const pct=(p*100).toLocaleString('es-CL',{maximumSignificantDigits:3}); return pct+' % (1 en '+Math.round(1/p).toLocaleString('es-CL')+')'; }
+function parseProb(txt){ let t=String(txt).trim().replace(',','.'); if(!t)return null; if(t.includes('/')){ const [a,b]=t.split('/').map(Number); return (a>0&&b>0)?a/b:null; } if(t.endsWith('%')){ const n=parseFloat(t); return n>0?n/100:null; } const n=parseFloat(t); if(!(n>0))return null; return n>1?n/100:n; }
 const ESTADOS=['Idea','Borrador','En prueba','Final'];
 
 /* ---------- Firebase: login y sincronización de equipo ---------- */
@@ -665,7 +669,7 @@ function proj(){ return state.projects.find(p=>p.id===state.activeId)||state.pro
 function curType(){ const p=proj(); return p.types.find(t=>t.id===p.activeTypeId)||p.types[0]; }
 function fieldById(id){ return curType().fields.find(f=>f.id===id); }
 function primaryField(){ const p=curType(); return p.fields.find(f=>f.primary)||p.fields.find(f=>f.type==='text')||p.fields[0]; }
-function valOf(c,f){ const v=c.values[f.id]; if(v!==undefined)return v; if(f.type==='check')return false; if(f.type==='list'||f.type==='multiselect'||f.type==='abilities'||f.type==='icons')return []; return ''; }
+function valOf(c,f){ if(f.type==='calc')return calcVal(c,f); const v=c.values[f.id]; if(v!==undefined)return v; if(f.type==='check')return false; if(f.type==='list'||f.type==='multiselect'||f.type==='abilities'||f.type==='icons')return []; return ''; }
 function titleOf(c){ const pf=primaryField(); const v=pf?c.values[pf.id]:''; return (v===''||v===undefined||v===null)?'(sin título)':v; }
 function splitList(s){ return String(s).split(',').map(x=>x.trim()).filter(Boolean); }
 
@@ -760,6 +764,7 @@ function resetFilters(){ filterState={}; sortKey=null; }
 
 /* ---------- Filtro / orden ---------- */
 function cellText(c,f){ const v=valOf(c,f);
+  if(f.type==='calc')return fmtProb(v);
   if(f.type==='check')return v?'sí':'no';
   if(f.type==='abilities')return abilSorted(f,v).map(id=>{const a=(f.library||[]).find(x=>x.id===id);return a?abilityLabel(a):'';}).join(' ');
   if(f.type==='icons')return (v||[]).map(x=>x.tipo).join(' ');
@@ -780,7 +785,7 @@ function visibleComponents(){
   });
   if(!sortKey&&p.useCardNum){ list=[...list].sort((a,b)=>{ const av=(a.cardNum!=null)?+a.cardNum:1e9, bv=(b.cardNum!=null)?+b.cardNum:1e9; return av-bv; }); }
   if(sortKey==='_num'||sortKey==='_cardnum'){ const k=(sortKey==='_num')?'num':'cardNum'; list=[...list].sort((a,b)=>((+a[k]||0)-(+b[k]||0))*sortDir); }
-  else if(sortKey){ const f=fieldById(sortKey); list=[...list].sort((a,b)=>{ if(f&&f.type==='number')return ((+valOf(a,f)||0)-(+valOf(b,f)||0))*sortDir; return cellText(a,f||{}).localeCompare(cellText(b,f||{}),'es')*sortDir; }); }
+  else if(sortKey){ const f=fieldById(sortKey); list=[...list].sort((a,b)=>{ if(f&&(f.type==='number'||f.type==='calc'))return ((+valOf(a,f)||0)-(+valOf(b,f)||0))*sortDir; return cellText(a,f||{}).localeCompare(cellText(b,f||{}),'es')*sortDir; }); }
   return list;
 }
 function setSort(k){ if(sortKey===k)sortDir*=-1; else {sortKey=k;sortDir=1;} render(); }
@@ -870,6 +875,7 @@ function cardValHtml(c,f){
   const v=valOf(c,f);
   if(f.type==='abilities') return abilSorted(f,v).map(id=>{const a=(f.library||[]).find(x=>x.id===id); if(!a)return''; const cls=a.tipo==='Activa'?'act':a.tipo==='Pasiva'?'pas':''; return '<span class="chip '+cls+'"'+chipStyle(f,a.tipo)+' title="'+esc(abilityFull(a))+'">'+tok(a.nombre||a.texto)+'</span>';}).join('');
   if(f.type==='icons') return iconsHtml(v);
+  if(f.type==='calc') return esc(fmtProb(v));
   if(f.type==='check') return v?'<span class="yes">✓</span>':'<span class="no">—</span>';
   if(f.type==='multiselect') return (Array.isArray(v)?v:[]).map(x=>{const col=(f.colors||{})[x]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; return '<span class="tag"'+st+'>'+tok(x)+'</span>';}).join('');
   if(f.type==='list') return (Array.isArray(v)?v:[]).map(x=>'<span class="tag">'+tok(x)+'</span>').join('');
@@ -925,7 +931,7 @@ document.addEventListener('dblclick',e=>{
   if(m)autoFit(m[1]);
 });
 function isBlank(v){ return v===''||v===null||v===undefined||(Array.isArray(v)&&v.length===0); }
-function missAlert(c,f){ if(f.alertEmpty===false)return false; if(f.type==='check')return false; return isBlank(valOf(c,f)); }
+function missAlert(c,f){ if(f.alertEmpty===false)return false; if(f.type==='check'||f.type==='calc')return false; return isBlank(valOf(c,f)); }
 function cellHtml(c,f){ let h=cellHtmlBase(c,f); if(missAlert(c,f)) h=h.replace('<td class="','<td class="miss '); const e=_pm&&_pm[c.id+'|'+f.id]; if(e){ h=h.replace('<td class="','<td class="chg '); const i=h.indexOf('>'); h=h.slice(0,i+1)+chgBtnHtml(c.id,f.id,e)+h.slice(i+1); } return h; }
 function cellHtmlBase(c,f){
   const v=valOf(c,f);
@@ -933,6 +939,7 @@ function cellHtmlBase(c,f){
   const dcOpen=' ondblclick="openEdit(\''+c.id+'\')"';
   if(f.type==='abilities'){ return '<td class="cell-hab ec"'+dcOpen+'>'+abilBlocksHtml(f,v)+'</td>'; }
   if(f.type==='icons'){ const t=iconsHtml(v); return '<td class="cell-icon ec"'+dcOpen+'>'+t+'</td>'; }
+  if(f.type==='calc') return '<td class="ec" title="Se calcula solo a partir del costo">'+esc(fmtProb(v))+'</td>';
   if(f.type==='check') return '<td class="ec"'+dcEdit+'>'+(v?'<span class="yes">✓</span>':'<span class="no">—</span>')+'</td>';
   if(f.type==='long'){ const shown=tok(String(v).length>140?String(v).slice(0,140)+'…':v); return '<td class="long ec"'+dcEdit+' title="'+esc(v)+'">'+(f.italic?'<i>'+shown+'</i>':shown)+'</td>'; }
   if(f.type==='multiselect') return '<td class="ec"'+dcEdit+'>'+(Array.isArray(v)?v:[]).map(x=>{const col=(f.colors||{})[x]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; return '<span class="tag"'+st+'>'+tok(x)+'</span>';}).join('')+'</td>';
@@ -996,6 +1003,7 @@ function doReplace(){
 }
 function editCell(td,cid,fidId){
   const f=fieldById(fidId); const c=curType().components.find(x=>x.id===cid); if(!f||!c)return;
+  if(f.type==='calc'){ toast('Este campo se calcula solo a partir del costo'); return; }
   if(f.type==='multiselect'){ openEdit(cid); return; }
   if(f.type==='check'){ if(c.values[fidId])delete c.values[fidId]; else c.values[fidId]=true; save(); render(); return; }
   const cur=valOf(c,f); let input;
@@ -1055,6 +1063,7 @@ function renderFields(){
     else if(f.type==='text'||f.type==='long') cfg='<label style="font-size:12px;color:var(--muted);font-weight:normal;display:inline-flex;gap:5px;align-items:center"><input type="checkbox" '+(f.italic?'checked':'')+' onchange="toggleItalic(\''+f.id+'\',this.checked)"> <i>Cursiva</i></label>';
     else if(f.type==='abilities') cfg='<button class="btn ghost mini" onclick="openAbilityLib(\''+f.id+'\')">Configurar habilidades ('+(f.library||[]).length+')</button>';
     else if(f.type==='icons') cfg='<button class="btn ghost mini" onclick="openIconSet(\''+f.id+'\')">Configurar íconos ('+(f.iconSet||[]).length+')</button>';
+    else if(f.type==='calc'){ const ics=p.fields.filter(x=>x.type==='icons'); cfg=ics.length?'<select onchange="updateField(\''+f.id+'\',\'src\',this.value)">'+ics.map(x=>'<option value="'+x.id+'" '+(x.id===f.src?'selected':'')+'>Calcular desde: '+esc(x.label)+'</option>').join('')+'</select><div class="hint" style="margin:4px 0 0">Las probabilidades de cada ícono se definen en «Configurar íconos».</div>':'<span class="usecount">Primero crea un campo de íconos</span>'; }
     return '<tr><td style="white-space:nowrap"><button class="row-btn" onclick="moveField('+i+',-1)">▲</button><button class="row-btn" onclick="moveField('+i+',1)">▼</button></td>'+
       '<td><input type="text" value="'+esc(f.label)+'" onchange="updateField(\''+f.id+'\',\'label\',this.value)"></td>'+
       '<td><select onchange="updateField(\''+f.id+'\',\'type\',this.value)">'+typeOpts+'</select></td>'+
@@ -1074,7 +1083,8 @@ function addField(){ curType().fields.push({id:fid(),label:'Nuevo campo',type:'t
 function updateField(id,field,val){
   const f=fieldById(id); if(!f)return;
   if(field==='label'){ f.label=val.trim()||f.label; }
-  else if(field==='type'){ f.type=val; delete f.options; delete f.library; delete f.iconSet; delete f.colors; delete f.rowColor; if(val==='select'||val==='multiselect')f.options=[]; if(val==='abilities')f.library=[]; if(val==='icons')f.iconSet=[]; save(); renderFields(); return; }
+  else if(field==='type'){ f.type=val; delete f.options; delete f.library; delete f.iconSet; delete f.colors; delete f.rowColor; if(val==='select'||val==='multiselect')f.options=[]; if(val==='abilities')f.library=[]; if(val==='icons')f.iconSet=[]; if(val==='calc'){ const ic=curType().fields.find(x=>x.type==='icons'); if(ic)f.src=ic.id; } save(); renderFields(); render(); return; }
+  else if(field==='src'){ f.src=val; save(); renderFields(); render(); return; }
   else if(field==='options'){
     const oldO=Array.isArray(f.options)?[...f.options]:[];
     f.options=splitList(val);
@@ -1290,17 +1300,18 @@ function icoUse(nombre){ return curType().components.filter(c=>Array.isArray(c.v
 function openIconSet(id){ setFieldId=id; document.getElementById('mSetTitle').textContent='Íconos — '+setField().label; renderSet(); openModal('mSet'); }
 function renderSet(){
   const f=setField(); if(!f)return;
-  document.getElementById('setBody').innerHTML=(f.iconSet||[]).map((it,i)=>{ const u=icoUse(it.nombre); let opts=''; for(let n=1;n<=9;n++)opts+='<option value="'+n+'" '+(n===it.max?'selected':'')+'>'+n+'</option>'; return '<tr><td><input type="text" value="'+esc(it.nombre)+'" onchange="updateSetIcon('+i+',\'nombre\',this.value)"></td><td><select onchange="updateSetIcon('+i+',\'max\',this.value)">'+opts+'</select></td><td><span class="usecount">'+u+' carta'+(u===1?'':'s')+'</span></td><td><button class="row-btn" onclick="deleteSetIcon('+i+')">🗑</button></td></tr>'; }).join('');
+  document.getElementById('setBody').innerHTML=(f.iconSet||[]).map((it,i)=>{ const u=icoUse(it.nombre); let opts=''; for(let n=1;n<=9;n++)opts+='<option value="'+n+'" '+(n===it.max?'selected':'')+'>'+n+'</option>'; return '<tr><td><input type="text" value="'+esc(it.nombre)+'" onchange="updateSetIcon('+i+',\'nombre\',this.value)"></td><td><select onchange="updateSetIcon('+i+',\'max\',this.value)">'+opts+'</select></td><td><input type="text" placeholder="ej. 1/8" value="'+(typeof it.prob==='number'?esc(String(+it.prob.toPrecision(6)).replace('.',',')):'')+'" onchange="updateSetIcon('+i+',\'prob\',this.value)"></td><td><span class="usecount">'+u+' carta'+(u===1?'':'s')+'</span></td><td><button class="row-btn" onclick="deleteSetIcon('+i+')">🗑</button></td></tr>'; }).join('');
   document.getElementById('setEmpty').style.display=(f.iconSet||[]).length?'none':'';
 }
 function addSetIcon(){ setField().iconSet.push({nombre:'Nuevo ícono',max:1}); save(); renderSet(); }
-function updateSetIcon(i,field,val){ const f=setField(); const it=f.iconSet[i]; if(!it)return; if(field==='nombre'){ const oldN=it.nombre,newN=val.trim(); if(!newN)return; if(f.iconSet.some((o,j)=>j!==i&&o.nombre===newN)){toast('Ya existe un ícono con ese nombre');renderSet();return;} it.nombre=newN; curType().components.forEach(c=>{ if(Array.isArray(c.values[setFieldId]))c.values[setFieldId].forEach(x=>{if(x.tipo===oldN)x.tipo=newN;}); }); } else if(field==='max'){ it.max=Math.max(1,parseInt(val)||1); curType().components.forEach(c=>{ if(Array.isArray(c.values[setFieldId]))c.values[setFieldId].forEach(x=>{if(x.tipo===it.nombre&&x.cantidad>it.max)x.cantidad=it.max;}); }); } save(); toast('Ícono actualizado'); }
+function updateSetIcon(i,field,val){ const f=setField(); const it=f.iconSet[i]; if(!it)return; if(field==='nombre'){ const oldN=it.nombre,newN=val.trim(); if(!newN)return; if(f.iconSet.some((o,j)=>j!==i&&o.nombre===newN)){toast('Ya existe un ícono con ese nombre');renderSet();return;} it.nombre=newN; curType().components.forEach(c=>{ if(Array.isArray(c.values[setFieldId]))c.values[setFieldId].forEach(x=>{if(x.tipo===oldN)x.tipo=newN;}); }); } else if(field==='prob'){ const pr=parseProb(val); if(pr===null){ delete it.prob; } else if(pr>1){ toast('La probabilidad no puede ser mayor que 1'); renderSet(); return; } else it.prob=pr; } else if(field==='max'){ it.max=Math.max(1,parseInt(val)||1); curType().components.forEach(c=>{ if(Array.isArray(c.values[setFieldId]))c.values[setFieldId].forEach(x=>{if(x.tipo===it.nombre&&x.cantidad>it.max)x.cantidad=it.max;}); }); } save(); toast('Ícono actualizado'); }
 function deleteSetIcon(i){ const f=setField(); const it=f.iconSet[i]; if(!it)return; if(!confirm('¿Eliminar el ícono "'+it.nombre+'"? Se quitará de todas las cartas.'))return; f.iconSet.splice(i,1); curType().components.forEach(c=>{ if(Array.isArray(c.values[setFieldId]))c.values[setFieldId]=c.values[setFieldId].filter(x=>x.tipo!==it.nombre); }); save(); renderSet(); }
 function closeSet(){ closeModal('mSet'); render(); }
 
 /* ---------- Editor de componente ---------- */
 function fieldInputHtml(f){
   const v=editValues[f.id]; const lab='<label class="flabel">'+esc(f.label)+(f.primary?' *':'')+'</label>';
+  if(f.type==='calc') return '<div class="fld">'+lab+'<div class="hint" style="margin:0">Se calcula solo a partir del costo al guardar.</div></div>';
   if(f.type==='abilities'){
     const sel=Array.isArray(v)?v:[]; const lib=[...(f.library||[])].sort((a,b)=>(a.tipo+a.nombre).localeCompare(b.tipo+b.nombre,'es'));
     let h='<div class="fld special">'+lab+'<div class="picker">'+(lib.length?lib.map(a=>'<label class="pick-item"><input type="checkbox" '+(sel.includes(a.id)?'checked':'')+' onchange="toggleAbilityVal(\''+f.id+'\',\''+a.id+'\',this.checked)"><span><span class="t '+a.tipo+'">'+a.tipo+'</span>'+esc(abilityLabel(a))+'</span></label>').join(''):'<div class="hint">Sin habilidades. Créalas abajo o en la pestaña Campos.</div>')+'</div>';
@@ -1405,7 +1416,7 @@ function renderBulkPreview(){
   let maxCols = 0;
   allRows.forEach(cols => { if(cols.length > maxCols) maxCols = cols.length; });
   // campos asignables: todos menos habilidades/íconos, más los recién creados aquí
-  const mapFields = p.fields.filter(f => (f.type!=='abilities' && f.type!=='icons') || bulkNewFieldIds.has(f.id));
+  const mapFields = p.fields.filter(f => (f.type!=='abilities' && f.type!=='icons' && f.type!=='calc') || bulkNewFieldIds.has(f.id));
   let html = '<label style="display:inline-flex;align-items:center;gap:7px;font-weight:normal;font-size:13px;margin:2px 0 8px;cursor:pointer"><input type="checkbox" id="bulkHeaderChk" '+(bulkHasHeader?'checked':'')+' onchange="onBulkHeaderToggle(this)"> La primera fila es un <b>encabezado</b> (no se importa como dato)</label>';
   html += '<table style="margin-top:2px"><thead><tr>';
   for(let i=0; i<maxCols; i++){
@@ -1524,7 +1535,7 @@ function saveBulkAdd(){
 }
 function openBulkEdit(){
   if(!selected.size)return; const p=curType();
-  const editable=p.fields.filter(f=>f.type!=='abilities'&&f.type!=='icons');
+  const editable=p.fields.filter(f=>f.type!=='abilities'&&f.type!=='icons'&&f.type!=='calc');
   document.getElementById('beField').innerHTML='<option value="">— No cambiar campo —</option>'+editable.map(f=>'<option value="'+f.id+'">'+esc(f.label)+'</option>').join('');
   renderBulkValue();
   // add/quitar habilidad: opciones de todos los campos de habilidades
@@ -1566,6 +1577,7 @@ function bulkDelete(){ if(!confirm('¿Eliminar los '+selected.size+' seleccionad
 
 /* ---------- Exportar ---------- */
 function fieldOut(c,f){ const v=valOf(c,f);
+  if(f.type==='calc')return fmtProb(v);
   if(f.type==='check')return v?'Sí':'No';
   if(f.type==='abilities')return abilSorted(f,v).map(id=>{const a=(f.library||[]).find(x=>x.id===id);return a?abilityFull(a):'';}).filter(Boolean).join(' | ');
   if(f.type==='icons')return (v||[]).map(x=>x.tipo+' ×'+x.cantidad).join(', ');
