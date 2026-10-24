@@ -60,6 +60,18 @@
   .tile-plus{font-size:26px; line-height:1;}
   .toolbar{display:flex; gap:8px; padding:14px 24px; flex-wrap:wrap; align-items:center;}
   .fdrop{position:relative;display:inline-block;vertical-align:middle;}
+  .thf{border:none;background:none;color:var(--muted);opacity:.55;cursor:pointer;padding:2px 3px;margin-left:3px;border-radius:5px;vertical-align:-1px;line-height:0;}
+  th:hover .thf{opacity:1;} .thf:hover{background:rgba(0,0,0,.06);opacity:1;}
+  .thf.on{opacity:1;color:#fff;background:var(--game,var(--accent));}
+  #fpFloat.fpanel{position:fixed;z-index:500;min-width:250px;max-width:340px;top:0;left:0;}
+  .fpanel .fp-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);padding:2px 4px 6px;}
+  .fpanel .fp-n{font-size:11px;color:var(--muted);font-weight:700;min-width:18px;text-align:right;}
+  .fpanel .fp-sw{width:10px;height:10px;border-radius:3px;flex:none;display:inline-block;}
+  .fpanel .fp-row.cur{background:#f4f1ea;}
+  .fpanel .fp-row{cursor:pointer;}
+  .fchip{display:inline-flex;align-items:center;gap:4px;padding:6px 6px 6px 10px;border-radius:999px;background:var(--gray-soft);border:1px solid var(--line);font-size:12px;font-weight:600;cursor:pointer;margin-right:4px;white-space:nowrap;}
+  .fchip button{border:none;background:none;cursor:pointer;color:var(--muted);font-size:14px;line-height:1;padding:0 4px;border-radius:50%;}
+  .fchip button:hover{background:rgba(0,0,0,.08);color:var(--ink);}
   .fdrop>button{padding:8px 26px 8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:var(--panel);cursor:pointer;position:relative;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:inherit;font-family:inherit;}
   .fdrop>button::after{content:'▾';position:absolute;right:9px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted);}
   .fdrop>button.on{border-color:var(--accent);background:#fff4ec;}
@@ -957,6 +969,24 @@ function fdropHtml(f,opts){ const fs=filterState[f.id]; const sel=fs&&fs.sel; co
 function typeCheckField(t){ return t.fields.find(f=>f.type==='select'&&f.colors&&Object.keys(f.colors).length); }
 function renderTypeChecks(t,f){ const box=document.getElementById('typeChecks'); if(!box)return; if(!f){ box.innerHTML=''; box.style.display='none'; return; } box.style.display=''; const opts=filterOpts(f); const fs=filterState[f.id]; const sel=fs&&fs.sel; box.innerHTML='<span class="tc-lbl">'+esc(f.label)+'</span>'+opts.map((o,i)=>{ const on=!sel||sel.includes(o[0]); const n=t.components.filter(c=>matchFilter(c,f,[o[0]])).length; const col=(f.colors||{})[o[0]]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':' style="background:var(--gray-soft)"'; return '<label class="tcheck'+(on?'':' off')+'"'+st+' title="Mostrar u ocultar"><input type="checkbox" '+(on?'checked':'')+' onchange="fdropToggle(\''+f.id+'\','+i+',this.checked)"> '+tok(o[1])+' <b>'+n+'</b></label>'; }).join('')+(sel?' <button class="btn ghost mini" onclick="fdropAll(\''+f.id+'\',true)">Mostrar todos</button>':''); }
 function toggleFdrop(id){ openFdrop=(openFdrop===id)?null:id; render(); }
+// Filtros en los encabezados de la lista: un botón por columna abre un panel flotante (fuera de la tabla para que no lo corte el scroll).
+const THF_SVG='<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v5l-4 2v-7z"/></svg>';
+function thfBtn(id,on){ return '<button type="button" class="thf'+(on?' on':'')+'" data-thf="'+id+'" draggable="false" title="Filtrar" aria-label="Filtrar esta columna" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();toggleFdrop(\''+id+'\')">'+THF_SVG+'</button>'; }
+function activeFilterChips(t){ let h=''; if(filterState._selc)h+='<span class="fchip">Seleccionadas: '+(filterState._selc==='si'?'sí':'no')+' <button type="button" title="Quitar este filtro" onclick="setFilter(\'_selc\',\'\')">×</button></span>';
+  t.fields.forEach(f=>{ const fs=filterState[f.id]; if(!fs||!fs.sel)return; const opts=filterOpts(f); if(!opts.length)return; h+='<span class="fchip" onclick="event.stopPropagation();toggleFdrop(\''+f.id+'\')" title="Cambiar filtro">'+fdropLabel(f,opts)+' <button type="button" title="Quitar este filtro" onclick="event.stopPropagation();fdropAll(\''+f.id+'\',true)">×</button></span>'; });
+  return h; }
+function floatPanelHtml(id){ const t=curType();
+  if(id==='_selc'){ const cur=filterState._selc||''; const n=v=>t.components.filter(c=>v===''?true:(v==='si')===isSelc(c)).length; return '<div class="fp-title">Seleccionada</div>'+[['','Todas'],['si','Sí, en uso'],['no','No seleccionadas']].map(o=>'<div class="fp-row'+(cur===o[0]?' cur':'')+'" onclick="setFilter(\'_selc\',\''+o[0]+'\')"><label><input type="radio" name="fpsel" '+(cur===o[0]?'checked':'')+'> '+o[1]+'</label><b class="fp-n">'+n(o[0])+'</b></div>').join(''); }
+  const f=fieldById(id); if(!f)return ''; const opts=filterOpts(f); const fs=filterState[f.id]; const sel=fs&&fs.sel; const cols=f.colors||{};
+  return '<div class="fp-title">'+esc(f.label)+'</div><div class="fp-acts"><button type="button" class="btn ghost mini" onclick="fdropAll(\''+f.id+'\',true)">Todos</button><button type="button" class="btn ghost mini" onclick="fdropAll(\''+f.id+'\',false)">Ninguno</button></div>'+opts.map((o,i)=>{ const n=t.components.filter(c=>matchFilter(c,f,[o[0]])).length; const col=cols[o[0]]; return '<div class="fp-row"><label><input type="checkbox" '+(!sel||sel.includes(o[0])?'checked':'')+' onchange="fdropToggle(\''+f.id+'\','+i+',this.checked)"> '+(col?'<span class="fp-sw" style="background:'+col+'"></span>':'')+tok(o[1])+'</label><b class="fp-n">'+n+'</b><span class="fp-only" onclick="fdropOnly(\''+f.id+'\','+i+')">solo este</span></div>'; }).join(''); }
+function placeFloatFilter(vm){ let el=document.getElementById('fpFloat');
+  const btn=openFdrop&&vm==='lista'?document.querySelector('[data-thf="'+openFdrop+'"]'):null;
+  if(!btn){ if(el)el.remove(); return; }
+  if(!el){ el=document.createElement('div'); el.id='fpFloat'; el.className='fpanel'; el.addEventListener('click',e=>e.stopPropagation()); document.body.appendChild(el); }
+  const keep=el.dataset.id===openFdrop?el.scrollTop:0; el.dataset.id=openFdrop; el.innerHTML=floatPanelHtml(openFdrop); el.scrollTop=keep; posFloatFilter(); }
+function posFloatFilter(){ const el=document.getElementById('fpFloat'); if(!el||!openFdrop)return; const b=document.querySelector('[data-thf="'+openFdrop+'"]'); if(!b){ el.remove(); return; } const r=b.getBoundingClientRect(); const w=el.offsetWidth||260; el.style.left=Math.max(8,Math.min(r.left-8,window.innerWidth-w-12))+'px'; const top=r.bottom+6; el.style.top=top+'px'; el.style.maxHeight=Math.max(160,window.innerHeight-top-16)+'px'; }
+document.addEventListener('scroll',posFloatFilter,true); window.addEventListener('resize',posFloatFilter);
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&openFdrop){ openFdrop=null; render(); } });
 function fdropSet(id,sel){ const f=fieldById(id); const all=filterOpts(f).map(o=>o[0]); if(sel.length===all.length&&all.every(x=>sel.includes(x)))delete filterState[id]; else filterState[id]={sel}; render(); }
 function fdropToggle(id,i,on){ const f=fieldById(id); const opts=filterOpts(f); const cur=filterState[id]&&filterState[id].sel?[...filterState[id].sel]:opts.map(o=>o[0]); const v=opts[i]&&opts[i][0]; if(v===undefined)return; const s=new Set(cur); if(on)s.add(v); else s.delete(v); fdropSet(id,[...s]); }
 function fdropOnly(id,i){ const f=fieldById(id); const opts=filterOpts(f); const v=opts[i]&&opts[i][0]; if(v===undefined)return; fdropSet(id,[v]); }
@@ -1060,9 +1090,12 @@ function renderComponents(){
   _pm=chgPendMap();
   { const ck=document.getElementById('chkPendOnly'); if(ck)ck.checked=pendOnly; }
   const df=document.getElementById('dynFilters'); df.innerHTML='';
-  const tcf=typeCheckField(p); renderTypeChecks(p,tcf);
-  { const cur=filterState._selc||''; df.innerHTML+='<select onchange="setFilter(\'_selc\',this.value)"><option value="">Seleccionada: todas</option><option value="si" '+(cur==='si'?'selected':'')+'>Seleccionada: sí</option><option value="no" '+(cur==='no'?'selected':'')+'>Seleccionada: no</option></select> '; }
-  p.fields.forEach(f=>{ if(f===tcf)return; const opts=filterOpts(f); if(!opts.length)return; df.innerHTML+=fdropHtml(f,opts); });
+  const vmode=(p.viewMode==='tarjetas')?'tarjetas':'lista';
+  renderTypeChecks(p,null);
+  if(vmode==='tarjetas'){
+    { const cur=filterState._selc||''; df.innerHTML+='<select onchange="setFilter(\'_selc\',this.value)"><option value="">Seleccionada: todas</option><option value="si" '+(cur==='si'?'selected':'')+'>Seleccionada: sí</option><option value="no" '+(cur==='no'?'selected':'')+'>Seleccionada: no</option></select> '; }
+    p.fields.forEach(f=>{ const opts=filterOpts(f); if(!opts.length)return; df.innerHTML+=fdropHtml(f,opts); });
+  } else df.innerHTML=activeFilterChips(p);
   const sb=document.getElementById('sortBox');
   let so='<option value="">Orden: '+(p.useCardNum?'N° de carta':'original')+'</option><option value="_num" '+(sortKey==='_num'?'selected':'')+'>Orden: ID</option>';
   if(p.useCardNum) so+='<option value="_cardnum" '+(sortKey==='_cardnum'?'selected':'')+'>Orden: N° de carta</option>';
@@ -1072,8 +1105,8 @@ function renderComponents(){
   let head='<tr><th class="nosort"><input type="checkbox" id="selAll" onchange="toggleAll(this)"><span class="rsz" onmousedown="startResize(event,\'sel\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'sel\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>';
   head+='<th onclick="setSort(\'_num\')">ID<span class="rsz" onmousedown="startResize(event,\'num\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'num\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>';
   if(p.useCardNum) head+='<th onclick="setSort(\'_cardnum\')">N° carta<span class="rsz" onmousedown="startResize(event,\'cardnum\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'cardnum\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>';
-  head+='<th class="nosort" title="¿Se usa este componente? Clic en Sí/No para cambiarlo">Selecc.<span class="rsz" onmousedown="startResize(event,\'selc\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'selc\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>';
-  p.fields.forEach(f=> head+='<th draggable="true" class="col-drag" onclick="setSort(\''+f.id+'\')" ondragstart="colDragStart(event,\''+f.id+'\')" ondragover="colDragOver(event,\''+f.id+'\')" ondragleave="colDragLeave(event)" ondrop="colDrop(event,\''+f.id+'\')" ondragend="colDragEnd(event)" title="Arrastra para reordenar la columna">'+esc(f.label)+(f.primary?' ★':'')+'<span class="rsz" draggable="false" onmousedown="startResize(event,\''+f.id+'\')" onclick="event.stopPropagation()" ondblclick="autoFit(\''+f.id+'\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>');
+  head+='<th class="nosort" title="¿Se usa este componente? Clic en Sí/No para cambiarlo">Selecc.'+thfBtn('_selc',!!filterState._selc)+'<span class="rsz" onmousedown="startResize(event,\'selc\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'selc\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>';
+  p.fields.forEach(f=> head+='<th draggable="true" class="col-drag" onclick="setSort(\''+f.id+'\')" ondragstart="colDragStart(event,\''+f.id+'\')" ondragover="colDragOver(event,\''+f.id+'\')" ondragleave="colDragLeave(event)" ondrop="colDrop(event,\''+f.id+'\')" ondragend="colDragEnd(event)" title="Arrastra para reordenar la columna">'+esc(f.label)+(f.primary?' ★':'')+(filterOpts(f).length?thfBtn(f.id,!!(filterState[f.id]&&filterState[f.id].sel)):'')+'<span class="rsz" draggable="false" onmousedown="startResize(event,\''+f.id+'\')" onclick="event.stopPropagation()" ondblclick="autoFit(\''+f.id+'\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>');
   head+='<th class="nosort">Resumen<span class="rsz" onmousedown="startResize(event,\'resumen\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'resumen\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th><th class="nosort"><span class="rsz" onmousedown="startResize(event,\'acc\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'acc\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th></tr>';
   const rcField=p.fields.find(f=>f.rowColor&&(f.type==='select'||f.type==='multiselect'));
   const rows=list.map(c=>{ let rs=''; if(rcField){ let rv=valOf(c,rcField); if(Array.isArray(rv))rv=rv[0]; const col=(rcField.colors||{})[rv]; if(col)rs=' style="background:'+hexA(col,0.13)+'"'; } let r='<tr'+rs+(isSelc(c)?'':' class="descartada"')+'><td><input type="checkbox" '+(selected.has(c.id)?'checked':'')+' onchange="toggleSel(\''+c.id+'\',this)"></td>';
@@ -1088,11 +1121,13 @@ function renderComponents(){
   const vm=(p.viewMode==='tarjetas')?'tarjetas':'lista';
   const bL=document.getElementById('vmLista'), bT=document.getElementById('vmTarjetas');
   if(bL&&bT){ bL.classList.toggle('active',vm==='lista'); bT.classList.toggle('active',vm==='tarjetas'); }
-  if(!list.length) wrap.innerHTML='<div class="empty">Este tipo de componente aún no tiene elementos.<br>Define su estructura en la pestaña <b>Campos</b>, y luego usa <b>+ Agregar nuevo</b> o <b>+ Agregar por lote</b>.</div>';
+  if(!list.length&&p.components.length&&vm==='lista') wrap.innerHTML='<table id="compTable" style="width:'+tableWidth()+'px; table-layout:fixed">'+colgroup()+'<thead>'+head+'</thead><tbody></tbody></table><div class="empty">Ningún componente coincide con los filtros. <button class="btn ghost mini" onclick="clearFiltros()">Quitar filtros</button></div>';
+  else if(!list.length) wrap.innerHTML='<div class="empty">Este tipo de componente aún no tiene elementos.<br>Define su estructura en la pestaña <b>Campos</b>, y luego usa <b>+ Agregar nuevo</b> o <b>+ Agregar por lote</b>.</div>';
   else if(vm==='tarjetas') wrap.innerHTML='<div class="cards">'+list.map(c=>cardHtml(c,p,rcField)).join('')+'</div>';
   else wrap.innerHTML='<table id="compTable" style="width:'+tableWidth()+'px; table-layout:fixed">'+colgroup()+'<thead>'+head+'</thead><tbody>'+rows+'</tbody></table>';
   for(const id of [...selected]) if(!p.components.some(c=>c.id===id)) selected.delete(id);
   const sa=document.getElementById('selAll'); if(sa) sa.checked=list.length>0&&list.every(c=>selected.has(c.id));
+  placeFloatFilter(vm);
   const btn=document.getElementById('bulkEditBtn'); btn.disabled=selected.size===0; btn.textContent=selected.size?('Editar selección ('+selected.size+')'):'Editar selección';
 }
 function setCompView(m){ curType().viewMode=m; save(); render(); }
@@ -1117,7 +1152,7 @@ function cardHtml(c,p,rcField){
   p.fields.forEach(f=>{ if(f===tf||f.inCard===false)return; const miss=missAlert(c,f); const ce=_pm&&_pm[c.id+'|'+f.id]; const vh=miss?'<span class="val-miss">Falta completar</span>':cardValHtml(c,f); if(!miss&&!ce&&(vh===''||vh==null))return; h+='<div class="card-field'+(miss?' miss':'')+(ce?' chg':'')+'">'+(ce?chgBtnHtml(c.id,f.id,ce):'')+'<span class="lbl">'+esc(f.label)+'</span>'+vh+'</div>'; });
   return h+'</div>';
 }
-function colDefault(key){ if(key==='sel')return 34; if(key==='selc')return 70; if(key==='num')return 56; if(key==='cardnum')return 80; if(key==='acc')return 90; if(key==='resumen')return 320; const f=fieldById(key); if(!f)return 150; return ({number:70,check:60,select:140,long:240,abilities:340,icons:150,multiselect:170,list:150})[f.type]||150; }
+function colDefault(key){ if(key==='sel')return 34; if(key==='selc')return 86; if(key==='num')return 56; if(key==='cardnum')return 80; if(key==='acc')return 90; if(key==='resumen')return 320; const f=fieldById(key); if(!f)return 150; return ({number:70,check:60,select:140,long:240,abilities:340,icons:150,multiselect:170,list:150})[f.type]||150; }
 function colWidth(key){ const p=curType(); return (p.colW&&p.colW[key])||colDefault(key); }
 function tableWidth(){ const p=curType(); let s=colWidth('sel')+colWidth('num')+(p.useCardNum?colWidth('cardnum'):0)+colWidth('selc'); p.fields.forEach(f=>s+=colWidth(f.id)); return s+colWidth('resumen')+colWidth('acc'); }
 function colgroup(){ const p=curType(); let g='<colgroup><col id="col_sel" style="width:'+colWidth('sel')+'px"><col id="col_num" style="width:'+colWidth('num')+'px">'; if(p.useCardNum)g+='<col id="col_cardnum" style="width:'+colWidth('cardnum')+'px">'; g+='<col id="col_selc" style="width:'+colWidth('selc')+'px">'; p.fields.forEach(f=>g+='<col id="col_'+f.id+'" style="width:'+colWidth(f.id)+'px">'); g+='<col id="col_resumen" style="width:'+colWidth('resumen')+'px"><col id="col_acc" style="width:'+colWidth('acc')+'px"></colgroup>'; return g; }
