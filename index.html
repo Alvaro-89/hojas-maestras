@@ -221,6 +221,14 @@
   :root{ --bg:#f4f6f3; --line:#dfe5df; --ink:#1d2a24; --muted:#5f6f66; --gray-soft:#eef1ee; --game:#2f7d4f; }
   body, button, input, select, textarea{font-family:'Plus Jakarta Sans','Segoe UI',system-ui,sans-serif;}
   aside{background:#2B2622; color:#D8D0C6; border-right:none; padding:18px 12px;}
+  .famorder{display:flex; flex-direction:column; gap:4px;}
+  .famorder .fo{display:flex; align-items:center; gap:8px; padding:7px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px;}
+  .famorder .fo.me{border-color:var(--game); background:var(--gray-soft); font-weight:700;}
+  .famorder .fo span{flex:1;}
+  .famorder .fo button{border:1px solid var(--line); background:#fff; border-radius:6px; width:28px; height:26px; cursor:pointer;}
+  .famorder .fo button:disabled{opacity:.35; cursor:default;}
+  .modal label.chk{display:flex; gap:8px; align-items:flex-start; font-weight:500; color:var(--ink); font-size:13px; line-height:1.4; margin-top:14px;}
+  .modal label.chk input{margin-top:3px;}
   .brand{display:flex; align-items:center; gap:10px; padding:0 6px 16px;}
   .brand-logo{width:30px; height:30px; flex:none; display:flex;}
   .brand-name{font-weight:800; font-size:15px; letter-spacing:.2px;}
@@ -486,19 +494,37 @@
 </div>
 
 <div class="overlay" id="mFamily">
-  <div class="modal">
+  <div class="modal" style="width:520px">
     <h3>Familia del juego</h3>
-    <p class="hint">Los juegos con el mismo nombre de familia aparecen juntos en la lista de juegos, por ejemplo un juego base y su expansión.</p>
-    <label>Nombre de la familia</label>
-    <input type="text" id="famName" list="famList" placeholder="ej. Kurrüf">
-    <datalist id="famList"></datalist>
-    <label>Cómo se llama este juego dentro de la familia</label>
-    <input type="text" id="famShort" placeholder="ej. Juego base, Expansión 2026">
-    <label>Posición dentro de la familia</label>
-    <input type="number" id="famOrder" placeholder="1 = primero" min="1">
-    <div class="modal-actions"><button class="btn ghost" onclick="clearFamily()">Quitar de la familia</button><span class="spacer"></span><button class="btn ghost" onclick="closeModal('mFamily')">Cancelar</button><button class="btn primary" onclick="saveFamily()">Guardar</button></div>
+    <p class="hint">Un juego base y sus expansiones o versiones forman una familia. En la lista de juegos aparecen juntos, bajo el nombre de la familia.</p>
+    <label>¿Es parte de otro juego?</label>
+    <select id="famParent" onchange="famParentChanged()"></select>
+    <div id="famBlock">
+      <label>Cómo se llama este juego dentro de la familia</label>
+      <input type="text" id="famShort" placeholder="ej. Juego base, Expansión 2026" oninput="renderFamOrder()">
+      <label>Orden en la lista</label>
+      <div id="famOrder" class="famorder"></div>
+    </div>
+    <div class="modal-actions"><span class="spacer"></span><button class="btn ghost" onclick="closeModal('mFamily')">Cancelar</button><button class="btn primary" onclick="saveFamily()">Guardar</button></div>
   </div>
 </div>
+
+<div class="overlay" id="mNewGame">
+  <div class="modal" style="width:520px">
+    <h3>Nuevo juego</h3>
+    <label>Nombre del juego</label>
+    <input type="text" id="ngName" placeholder="ej. Expansión Kurrüf 2027" onkeydown="if(event.key==='Enter')createGame()">
+    <label>¿Es parte de otro juego?</label>
+    <select id="ngParent" onchange="ngParentChanged()"></select>
+    <div id="ngBlock" style="display:none">
+      <label>Cómo se llama dentro de la familia</label>
+      <input type="text" id="ngShort" placeholder="ej. Expansión 2027">
+      <label class="chk"><input type="checkbox" id="ngCopy" checked> Usar los mismos tipos de componente, campos, íconos y habilidades (sin copiar las cartas)</label>
+    </div>
+    <div class="modal-actions"><span class="spacer"></span><button class="btn ghost" onclick="closeModal('mNewGame')">Cancelar</button><button class="btn primary" onclick="createGame()">Crear juego</button></div>
+  </div>
+</div>
+
 <div class="overlay" id="mAlertEx">
   <div class="modal">
     <h3 id="mAlertExTitle">Excepciones del aviso</h3>
@@ -877,7 +903,10 @@ function renderChanges(){
 function setView(v){ currentView=v; render(); }
 
 /* ---------- Proyectos ---------- */
-function addProject(){ askText('Nuevo juego','Nombre del juego','',n=>{ const p=newProject(n); state.projects.push(p); state.activeId=p.id; typeOpened=false; selected.clear(); resetFilters(); save(); render(); }); }
+function addProject(){ document.getElementById('ngName').value=''; document.getElementById('ngShort').value=''; document.getElementById('ngCopy').checked=true; document.getElementById('ngParent').innerHTML=famSelectHtml(null,''); ngParentChanged(); openModal('mNewGame'); setTimeout(()=>document.getElementById('ngName').focus(),30); }
+function ngParentChanged(){ const v=document.getElementById('ngParent').value; document.getElementById('ngBlock').style.display=v?'':'none'; const sh=document.getElementById('ngShort'); if(v&&!sh.value)sh.value='Expansión'; }
+function cloneStructure(src,p){ p.types=src.types.map(t=>{ const c=JSON.parse(JSON.stringify(t)); c.id=uid(); c.components=[]; return c; }); p.activeTypeId=p.types[0].id; if(src.color)p.color=src.color; }
+function createGame(){ const n=document.getElementById('ngName').value.trim(); if(!n){ toast('Escribe el nombre del juego'); return; } const p=newProject(n); const v=document.getElementById('ngParent').value; if(v){ const mem=famTarget(v,null); if(document.getElementById('ngCopy').checked){ const src=famSorted(mem)[0]; if(src)cloneStructure(src,p); } state.projects.push(p); applyFamily(famSorted(mem).concat([p]), famNameOf(v), p, document.getElementById('ngShort').value.trim()); } else state.projects.push(p); state.activeId=p.id; typeOpened=false; selected.clear(); resetFilters(); closeModal('mNewGame'); save(); render(); toast(v?'Juego creado dentro de la familia '+p.familia:'Juego creado'); }
 function renameProject(){ const p=proj(); askText('Renombrar juego','Nombre',p.name,n=>{ p.name=n; save(); render(); }); }
 function deleteProject(){ const p=proj(); if(!confirm('¿Eliminar "'+p.name+'" con sus '+p.types.reduce((s,t)=>s+t.components.length,0)+' componentes? No se puede deshacer.'))return; state.projects=state.projects.filter(x=>x.id!==p.id); if(!state.projects.length)state.projects.push(newProject('Mi primer juego')); state.activeId=state.projects[0].id; selected.clear(); resetFilters(); save(); render(); }
 function switchProject(id){ state.activeId=id; typeOpened=false; selected.clear(); resetFilters(); const s=document.getElementById('search'); if(s)s.value=''; save(); render(); }
@@ -943,9 +972,21 @@ function gameColor(x){ if(x&&x.color)return x.color; const i=Math.max(0,state.pr
 // Familias de juegos: p.familia (nombre del grupo), p.familiaCorto (nombre dentro del grupo), p.familiaOrden (posición).
 function projItemHtml(x,p,inFam){ return '<div class="proj '+(x.id===p.id?'active':'')+'" onclick="switchProject(\''+x.id+'\')" title="'+esc(x.name)+'">'+(inFam?'':'<span class="gdot" style="background:'+gameColor(x)+'"></span>')+'<span class="pname">'+esc(inFam&&x.familiaCorto?x.familiaCorto:x.name)+'</span><span class="count">'+x.types.reduce((s,t)=>s+t.components.length,0)+(chgCount(x)?'<span class="pend" title="Cambios pendientes de implementar">'+chgCount(x)+'</span>':'')+'</span></div>'; }
 function projectListHtml(p){ const seen=new Set(); let h=''; state.projects.forEach(x=>{ if(seen.has(x.id))return; const fam=(x.familia||'').trim(); const members=fam?state.projects.filter(y=>(y.familia||'').trim().toLowerCase()===fam.toLowerCase()):[x]; if(members.length<2){ seen.add(x.id); h+=projItemHtml(x,p,false); return; } members.sort((a,b)=>((a.familiaOrden??99)-(b.familiaOrden??99))||(state.projects.indexOf(a)-state.projects.indexOf(b))); members.forEach(m=>seen.add(m.id)); h+='<div class="fam"><div class="fam-head"><span class="gdot" style="background:'+gameColor(members[0])+'"></span><span class="fam-name">'+esc(fam)+'</span><span class="fam-n">'+members.length+' juegos</span></div>'+members.map(m=>projItemHtml(m,p,true)).join('')+'</div>'; }); return h; }
-function openFamily(){ const p=proj(); document.getElementById('famName').value=p.familia||''; document.getElementById('famShort').value=p.familiaCorto||''; document.getElementById('famOrder').value=(p.familiaOrden!=null?p.familiaOrden+1:''); document.getElementById('famList').innerHTML=[...new Set(state.projects.map(x=>x.familia).filter(Boolean))].map(f=>'<option value="'+esc(f)+'">').join(''); openModal('mFamily'); }
-function saveFamily(){ const p=proj(); const f=document.getElementById('famName').value.trim(); const sh=document.getElementById('famShort').value.trim(); const o=document.getElementById('famOrder').value; if(!f){ clearFamily(); return; } p.familia=f; if(sh)p.familiaCorto=sh; else delete p.familiaCorto; if(o!=='')p.familiaOrden=Math.max(0,(+o)-1); else delete p.familiaOrden; closeModal('mFamily'); save(); render(); toast('Familia guardada'); }
-function clearFamily(){ const p=proj(); delete p.familia; delete p.familiaCorto; delete p.familiaOrden; closeModal('mFamily'); save(); render(); toast('El juego ya no está en una familia'); }
+let famDraft=[];
+function famMembers(name){ const k=(name||'').trim().toLowerCase(); return k?state.projects.filter(y=>(y.familia||'').trim().toLowerCase()===k):[]; }
+function famSorted(arr){ return arr.slice().sort((a,b)=>((a.familiaOrden??99)-(b.familiaOrden??99))||(state.projects.indexOf(a)-state.projects.indexOf(b))); }
+function famList(){ return [...new Set(state.projects.map(x=>(x.familia||'').trim()).filter(f=>f&&famMembers(f).length>1))]; }
+// Opciones: familias existentes ("f:Nombre") y juegos sueltos ("g:id"); excluye al juego que se edita cuando queda solo.
+function famSelectHtml(selfId,sel){ let h='<option value="">No, es un juego independiente</option>'; const fams=famList(); if(fams.length)h+='<optgroup label="Familias">'+fams.map(f=>{ const m=famSorted(famMembers(f)); return '<option value="f:'+esc(f)+'"'+(sel==='f:'+f?' selected':'')+'>Sí, de la familia '+esc(f)+' ('+m.length+' juegos)</option>'; }).join('')+'</optgroup>'; const solos=state.projects.filter(x=>x.id!==selfId&&!fams.some(f=>f.toLowerCase()===(x.familia||'').trim().toLowerCase())); if(solos.length)h+='<optgroup label="Juegos">'+solos.map(x=>'<option value="g:'+x.id+'"'+(sel==='g:'+x.id?' selected':'')+'>Sí, de '+esc(x.name)+'</option>').join('')+'</optgroup>'; return h; }
+function famTarget(v,selfId){ if(!v)return []; if(v.startsWith('f:'))return famMembers(v.slice(2)).filter(x=>x.id!==selfId); const g=state.projects.find(x=>x.id===v.slice(2)); return g?[g]:[]; }
+function famNameOf(v){ if(v.startsWith('f:'))return v.slice(2); const g=state.projects.find(x=>x.id===v.slice(2)); return g?((g.familia||'').trim()||g.name):''; }
+function applyFamily(order,name,p,short){ order.forEach((x,i)=>{ x.familia=name; x.familiaOrden=i; if(x!==p&&!x.familiaCorto)x.familiaCorto=(i===0?'Juego base':x.name); }); if(short)p.familiaCorto=short; else p.familiaCorto=p.name; }
+function openFamily(){ const p=proj(); const f=(p.familia||'').trim(); const inFam=f&&famMembers(f).length>1; const sel=inFam?'f:'+f:''; document.getElementById('famParent').innerHTML=famSelectHtml(p.id,sel); document.getElementById('famShort').value=inFam?(p.familiaCorto||''):''; famParentChanged(true); openModal('mFamily'); }
+function famParentChanged(keep){ const p=proj(); const v=document.getElementById('famParent').value; document.getElementById('famBlock').style.display=v?'':'none'; if(!v){ famDraft=[]; return; } const sh=document.getElementById('famShort'); if(!sh.value)sh.value=p.name; const others=famSorted(famTarget(v,p.id)); if(keep===true&&famMembers(p.familia).some(x=>x.id===p.id)&&v==='f:'+(p.familia||'').trim()) famDraft=famSorted(famMembers(p.familia)).map(x=>x.id); else famDraft=others.map(x=>x.id).concat([p.id]); renderFamOrder(); }
+function renderFamOrder(){ const p=proj(); const el=document.getElementById('famOrder'); if(!el)return; const sh=document.getElementById('famShort').value.trim(); el.innerHTML=famDraft.map((id,i)=>{ const x=state.projects.find(y=>y.id===id); const me=id===p.id; const nm=me?(sh||p.name)+' (este juego)':(x.familiaCorto||x.name); return '<div class="fo'+(me?' me':'')+'"><span>'+(i+1)+'. '+esc(nm)+'</span><button type="button" onclick="famMove('+i+',-1)" '+(i===0?'disabled':'')+' aria-label="Subir">↑</button><button type="button" onclick="famMove('+i+',1)" '+(i===famDraft.length-1?'disabled':'')+' aria-label="Bajar">↓</button></div>'; }).join(''); }
+function famMove(i,d){ const j=i+d; if(j<0||j>=famDraft.length)return; [famDraft[i],famDraft[j]]=[famDraft[j],famDraft[i]]; renderFamOrder(); }
+function saveFamily(){ const p=proj(); const v=document.getElementById('famParent').value; if(!v){ clearFamily(); return; } const name=famNameOf(v); if(!name)return; if((p.familia||'').trim()&&(p.familia||'').trim().toLowerCase()!==name.toLowerCase()){ delete p.familia; delete p.familiaOrden; } const order=famDraft.map(id=>state.projects.find(x=>x.id===id)).filter(Boolean); applyFamily(order,name,p,document.getElementById('famShort').value.trim()); closeModal('mFamily'); save(); render(); toast('Familia guardada'); }
+function clearFamily(){ const p=proj(); const wasIn=famMembers(p.familia).length>1; if(!wasIn){ delete p.familia; delete p.familiaCorto; delete p.familiaOrden; closeModal('mFamily'); save(); render(); return; } delete p.familia; delete p.familiaCorto; delete p.familiaOrden; closeModal('mFamily'); save(); render(); toast('El juego ya no está en una familia'); }
 function setGameColor(c){ proj().color=c; save(); render(); }
 // Si el color del juego no se lee bien con texto blanco (menos de 4,5:1), se oscurece para el encabezado y los botones; el color guardado no cambia.
 function lumOf(hex){ hex=String(hex).replace('#',''); if(hex.length===3)hex=hex.split('').map(x=>x+x).join(''); const ch=[0,2,4].map(i=>{ const v=parseInt(hex.slice(i,i+2),16)/255; return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4); }); return 0.2126*ch[0]+0.7152*ch[1]+0.0722*ch[2]; }
