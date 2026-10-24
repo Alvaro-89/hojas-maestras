@@ -392,6 +392,16 @@
   </div>
 </div>
 
+<div class="overlay" id="mAlertEx">
+  <div class="modal">
+    <h3 id="mAlertExTitle">Excepciones del aviso</h3>
+    <p class="hint">No mostrar el aviso de campo vacío en las cartas que tengan alguno de estos valores.</p>
+    <label>Según el campo</label>
+    <select id="alertExField" onchange="renderAlertExOpts([])"></select>
+    <div id="alertExOpts" style="margin-top:10px;max-height:300px;overflow:auto"></div>
+    <div class="modal-actions"><button class="btn ghost" onclick="closeModal('mAlertEx')">Cancelar</button><button class="btn primary" onclick="saveAlertEx()">Guardar</button></div>
+  </div>
+</div>
 <div class="overlay" id="mSet">
   <div class="modal">
     <h3 id="mSetTitle">Ecosistemas</h3>
@@ -931,7 +941,15 @@ document.addEventListener('dblclick',e=>{
   if(m)autoFit(m[1]);
 });
 function isBlank(v){ return v===''||v===null||v===undefined||(Array.isArray(v)&&v.length===0); }
-function missAlert(c,f){ if(f.alertEmpty===false)return false; if(f.type==='check'||f.type==='calc')return false; return isBlank(valOf(c,f)); }
+function missAlert(c,f){ if(f.alertEmpty===false)return false; if(f.type==='check')return false; if(alertExempt(c,f))return false; return isBlank(valOf(c,f)); }
+// Excepciones del aviso de campo vacío: no avisar si otro campo (lista desplegable) tiene ciertos valores. Ej.: no pedir Costo en cartas de mano inicial.
+function alertExempt(c,f){ const ex=f.alertExcept; if(!ex||!ex.field||!Array.isArray(ex.values)||!ex.values.length)return false; const sf=curType().fields.find(x=>x.id===ex.field); if(!sf)return false; const v=valOf(c,sf); return Array.isArray(v)?v.some(x=>ex.values.includes(x)):ex.values.includes(v); }
+let alertExId=null;
+function alertExSrcFields(){ return curType().fields.filter(x=>(x.type==='select'||x.type==='multiselect')&&x.id!==alertExId); }
+function alertExOpts(sf){ const set=new Set(sf.options||[]); curType().components.forEach(c=>{ const v=valOf(c,sf); (Array.isArray(v)?v:[v]).forEach(x=>{ if(x)set.add(x); }); }); return [...set]; }
+function openAlertEx(id){ alertExId=id; const f=fieldById(id); if(!f)return; const srcs=alertExSrcFields(); if(!srcs.length){ toast('Primero crea un campo de lista desplegable (por ejemplo, Tipo de carta)'); return; } document.getElementById('mAlertExTitle').textContent='Excepciones del aviso: '+f.label; const ex=f.alertExcept||{}; const sel=document.getElementById('alertExField'); sel.innerHTML=srcs.map(x=>'<option value="'+x.id+'" '+(x.id===ex.field?'selected':'')+'>'+esc(x.label)+'</option>').join(''); renderAlertExOpts(ex.field===sel.value?(ex.values||[]):[]); openModal('mAlertEx'); }
+function renderAlertExOpts(checked){ const sf=fieldById(document.getElementById('alertExField').value); const box=document.getElementById('alertExOpts'); if(!sf){ box.innerHTML=''; return; } box.innerHTML=alertExOpts(sf).map(o=>'<label style="display:flex;gap:8px;align-items:center;font-weight:normal;margin:4px 0"><input type="checkbox" style="width:auto" value="'+esc(o)+'" '+((checked||[]).includes(o)?'checked':'')+'> '+tok(o)+'</label>').join('')||'<div class="hint">Este campo no tiene opciones.</div>'; }
+function saveAlertEx(){ const f=fieldById(alertExId); if(!f)return; const field=document.getElementById('alertExField').value; const values=[...document.querySelectorAll('#alertExOpts input:checked')].map(i=>i.value); if(values.length)f.alertExcept={field,values}; else delete f.alertExcept; save(); closeModal('mAlertEx'); renderFields(); render(); toast(values.length?'Excepciones guardadas':'Sin excepciones'); }
 function cellHtml(c,f){ let h=cellHtmlBase(c,f); if(missAlert(c,f)) h=h.replace('<td class="','<td class="miss '); const e=_pm&&_pm[c.id+'|'+f.id]; if(e){ h=h.replace('<td class="','<td class="chg '); const i=h.indexOf('>'); h=h.slice(0,i+1)+chgBtnHtml(c.id,f.id,e)+h.slice(i+1); } return h; }
 function cellHtmlBase(c,f){
   const v=valOf(c,f);
@@ -1070,7 +1088,7 @@ function renderFields(){
       '<td>'+cfg+'</td>'+
       '<td style="text-align:center"><input type="checkbox" '+(f.inSummary!==false?'checked':'')+' onchange="toggleInSummary(\''+f.id+'\',this.checked)"></td>'+
       '<td style="text-align:center"><input type="checkbox" '+(f.inCard!==false?'checked':'')+' onchange="toggleInCard(\''+f.id+'\',this.checked)"></td>'+
-      '<td style="text-align:center"><input type="checkbox" '+(f.alertEmpty!==false?'checked':'')+(f.type==='check'?' disabled title="Los campos Sí/No nunca quedan vacíos"':'')+' onchange="toggleAlertEmpty(\''+f.id+'\',this.checked)"></td>'+
+      '<td style="text-align:center"><input type="checkbox" '+(f.alertEmpty!==false?'checked':'')+(f.type==='check'?' disabled title="Los campos Sí/No nunca quedan vacíos"':'')+' onchange="toggleAlertEmpty(\''+f.id+'\',this.checked)">'+((f.alertEmpty!==false&&f.type!=='check')?'<br><button class="btn ghost mini" style="margin-top:4px" title="Elegir en qué cartas no avisar" onclick="openAlertEx(\''+f.id+'\')">'+(f.alertExcept&&f.alertExcept.values&&f.alertExcept.values.length?'Excepto '+f.alertExcept.values.length:'Excepciones')+'</button>':'')+'</td>'+
       '<td style="text-align:center"><input type="checkbox" '+(f.noTrack?'':'checked')+' onchange="toggleTrackField(\''+f.id+'\',this.checked)"></td>'+
       '<td style="text-align:center"><input type="radio" name="primaryField" '+(f.primary?'checked':'')+' onchange="setPrimary(\''+f.id+'\')"></td>'+
       '<td style="white-space:nowrap"><button class="row-btn" title="Duplicar campo" onclick="duplicateField(\''+f.id+'\')">⧉</button><button class="row-btn" onclick="deleteField(\''+f.id+'\')">🗑</button></td></tr>';
