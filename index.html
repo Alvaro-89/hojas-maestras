@@ -709,7 +709,7 @@ function pushCloud(){
     client:CLIENT_ID,
     updatedBy:(fbAuth.currentUser&&fbAuth.currentUser.email)||'',
     updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-  }).catch(()=>toast('No se pudo guardar en la nube — revisa tu conexión'));
+  }).catch(e=>toast(/longer than|too large|exceeds/i.test(String(e&&e.message||e))?'No se pudo guardar en la nube: los datos superan el límite de 1 MB del documento. Los cambios quedan solo en este navegador; avisa para liberar espacio.':'No se pudo guardar en la nube — revisa tu conexión'));
 }
 // Sube el cambio a la nube de inmediato (sin esperar los 600 ms), para cambios
 // estructurales como borrar/duplicar campos, así no se pierden ni "reaparecen".
