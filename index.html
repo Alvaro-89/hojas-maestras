@@ -56,6 +56,18 @@
   .tile-add:hover{color:var(--accent);}
   .tile-plus{font-size:26px; line-height:1;}
   .toolbar{display:flex; gap:8px; padding:14px 24px; flex-wrap:wrap; align-items:center;}
+  .fdrop{position:relative;display:inline-block;vertical-align:middle;}
+  .fdrop>button{padding:8px 26px 8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:var(--panel);cursor:pointer;position:relative;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:inherit;font-family:inherit;}
+  .fdrop>button::after{content:'▾';position:absolute;right:9px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted);}
+  .fdrop>button.on{border-color:var(--accent);background:#fff4ec;}
+  .fpanel{position:absolute;z-index:30;top:calc(100% + 4px);left:0;min-width:230px;max-height:340px;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:8px;}
+  .fpanel .fp-acts{display:flex;gap:6px;margin-bottom:6px;}
+  .fpanel .fp-row{display:flex;align-items:center;gap:8px;padding:3px 4px;border-radius:6px;font-size:13px;}
+  .fpanel .fp-row:hover{background:#f4f1ea;}
+  .fpanel .fp-row label{flex:1;display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:normal;margin:0;}
+  .fpanel .fp-row input{width:auto;margin:0;}
+  .fpanel .fp-only{font-size:11px;color:var(--accent);cursor:pointer;visibility:hidden;}
+  .fpanel .fp-row:hover .fp-only{visibility:visible;}
   .toolbar input[type=text], .toolbar select{padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:13px; background:var(--panel);}
   .toolbar input[type=text]{width:200px;}
   .btn{padding:8px 14px; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:600; background:var(--gray-soft); color:var(--ink);}
@@ -788,17 +800,36 @@ function cellText(c,f){ const v=valOf(c,f);
   if(f.type==='icons')return (v||[]).map(x=>x.tipo).join(' ');
   if(Array.isArray(v))return v.join(' ');
   return String(v??''); }
+// Filtros con casillas: filterState[campo]={sel:[valores visibles]}. Sin entrada = se ve todo.
+let openFdrop=null;
+function filterOpts(f){ const p=curType(); let opts=[];
+  if(f.type==='select') opts=[...new Set([...(f.options||[]),...p.components.map(c=>valOf(c,f)).filter(Boolean)])].map(v=>[v,v]);
+  else if(f.type==='multiselect'||f.type==='list'){ const set=new Set(); (f.options||[]).forEach(o=>set.add(o)); p.components.forEach(c=>{ const v=valOf(c,f); (Array.isArray(v)?v:[]).forEach(x=>set.add(x)); }); opts=[...set].sort((a,b)=>String(a).localeCompare(String(b),'es')).map(v=>[v,v]); }
+  else if(f.type==='check') opts=[['si','Sí'],['no','No']];
+  else if(f.type==='abilities') opts=[...(f.library||[])].sort((a,b)=>String(a.nombre||a.texto).localeCompare(String(b.nombre||b.texto),'es')).map(a=>[a.id,a.nombre||a.texto]);
+  else if(f.type==='icons') opts=(f.iconSet||[]).map(it=>[it.nombre,it.nombre]);
+  else return [];
+  if(f.type!=='check'&&p.components.some(c=>fKeys(c,f).length===0)) opts.push(['__empty','(sin valor)']);
+  return opts; }
+function fKeys(c,f){ const v=valOf(c,f); if(f.type==='check')return [v?'si':'no']; if(f.type==='icons')return (Array.isArray(v)?v:[]).map(x=>x.tipo); if(Array.isArray(v))return v.filter(x=>x!==''&&x!=null); return (v===''||v==null)?[]:[String(v)]; }
+function matchFilter(c,f,sel){ const k=fKeys(c,f); if(!k.length)return sel.includes('__empty'); return k.some(x=>sel.includes(x)); }
+function fdropLabel(f,opts){ const fs=filterState[f.id]; if(!fs||!fs.sel)return esc(f.label)+': todos'; const on=opts.filter(o=>fs.sel.includes(o[0])); const off=opts.filter(o=>!fs.sel.includes(o[0])); if(!on.length)return esc(f.label)+': ninguno'; if(on.length===1)return esc(f.label)+': '+esc(on[0][1]); if(off.length===1)return esc(f.label)+': sin '+esc(off[0][1]); return esc(f.label)+': '+on.length+' de '+opts.length; }
+function fdropHtml(f,opts){ const fs=filterState[f.id]; const sel=fs&&fs.sel; const open=openFdrop===f.id; let h='<span class="fdrop" onclick="event.stopPropagation()"><button type="button" class="'+(sel?'on':'')+'" onclick="toggleFdrop(\''+f.id+'\')" title="Desmarca lo que no quieras ver">'+fdropLabel(f,opts)+'</button>';
+  if(open){ h+='<div class="fpanel"><div class="fp-acts"><button type="button" class="btn ghost mini" onclick="fdropAll(\''+f.id+'\',true)">Todos</button><button type="button" class="btn ghost mini" onclick="fdropAll(\''+f.id+'\',false)">Ninguno</button></div>'+opts.map((o,i)=>'<div class="fp-row"><label><input type="checkbox" '+(!sel||sel.includes(o[0])?'checked':'')+' onchange="fdropToggle(\''+f.id+'\','+i+',this.checked)"> '+tok(o[1])+'</label><span class="fp-only" onclick="fdropOnly(\''+f.id+'\','+i+')">solo este</span></div>').join('')+'</div>'; }
+  return h+'</span> '; }
+function toggleFdrop(id){ openFdrop=(openFdrop===id)?null:id; render(); }
+function fdropSet(id,sel){ const f=fieldById(id); const all=filterOpts(f).map(o=>o[0]); if(sel.length===all.length&&all.every(x=>sel.includes(x)))delete filterState[id]; else filterState[id]={sel}; render(); }
+function fdropToggle(id,i,on){ const f=fieldById(id); const opts=filterOpts(f); const cur=filterState[id]&&filterState[id].sel?[...filterState[id].sel]:opts.map(o=>o[0]); const v=opts[i]&&opts[i][0]; if(v===undefined)return; const s=new Set(cur); if(on)s.add(v); else s.delete(v); fdropSet(id,[...s]); }
+function fdropOnly(id,i){ const f=fieldById(id); const opts=filterOpts(f); const v=opts[i]&&opts[i][0]; if(v===undefined)return; fdropSet(id,[v]); }
+function fdropAll(id,on){ const f=fieldById(id); fdropSet(id,on?filterOpts(f).map(o=>o[0]):[]); }
+document.addEventListener('click',()=>{ if(openFdrop){ openFdrop=null; render(); } });
 function visibleComponents(){
   const q=document.getElementById('search').value.trim().toLowerCase(); const p=curType();
   const pendSet=pendOnly?new Set(chgLog(proj()).filter(e=>!e.done).map(e=>e.cardId)):null;
   let list=p.components.filter(c=>{
     if(pendSet&&!pendSet.has(c.id))return false;
     if(filterState._selc){ if((filterState._selc==='si')!==isSelc(c))return false; }
-    for(const k in filterState){ const f=fieldById(k); const fv=filterState[k]; if(!f||!fv)continue; const v=valOf(c,f);
-      if(f.type==='multiselect'||f.type==='list'||f.type==='abilities'){ if(!(Array.isArray(v)&&v.includes(fv)))return false; }
-      else if(f.type==='icons'){ if(!(Array.isArray(v)&&v.some(x=>x.tipo===fv)))return false; }
-      else if(f.type==='check'){ if((fv==='si')!==!!v)return false; }
-      else if(cellText(c,f)!==fv)return false; }
+    for(const k in filterState){ if(k==='_selc')continue; const f=fieldById(k); const fs=filterState[k]; if(!f||!fs||!Array.isArray(fs.sel))continue; if(!matchFilter(c,f,fs.sel))return false; }
     if(q){ if(!(p.fields.map(f=>cellText(c,f)).join(' ')+' '+(c.num??'')+' '+(c.cardNum??'')).toLowerCase().includes(q))return false; }
     return true;
   });
@@ -849,17 +880,7 @@ function renderComponents(){
   { const ck=document.getElementById('chkPendOnly'); if(ck)ck.checked=pendOnly; }
   const df=document.getElementById('dynFilters'); df.innerHTML='';
   { const cur=filterState._selc||''; df.innerHTML+='<select onchange="setFilter(\'_selc\',this.value)"><option value="">Seleccionada: todas</option><option value="si" '+(cur==='si'?'selected':'')+'>Seleccionada: sí</option><option value="no" '+(cur==='no'?'selected':'')+'>Seleccionada: no</option></select> '; }
-  p.fields.forEach(f=>{
-    let opts=null;
-    if(f.type==='select') opts=[...new Set(p.components.map(c=>valOf(c,f)).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'es')).map(v=>[v,v]);
-    else if(f.type==='multiselect'||f.type==='list'){ const set=new Set(); (f.options||[]).forEach(o=>set.add(o)); p.components.forEach(c=>{ const v=valOf(c,f); (Array.isArray(v)?v:[]).forEach(x=>set.add(x)); }); opts=[...set].sort((a,b)=>String(a).localeCompare(String(b),'es')).map(v=>[v,v]); }
-    else if(f.type==='check') opts=[['si','Sí'],['no','No']];
-    else if(f.type==='abilities') opts=[...(f.library||[])].sort((a,b)=>String(a.nombre||a.texto).localeCompare(String(b.nombre||b.texto),'es')).map(a=>[a.id,a.nombre||a.texto]);
-    else if(f.type==='icons') opts=(f.iconSet||[]).map(it=>[it.nombre,it.nombre]);
-    if(!opts||!opts.length)return;
-    const cur=filterState[f.id]||'';
-    df.innerHTML+='<select onchange="setFilter(\''+f.id+'\',this.value)"><option value="">'+esc(f.label)+': todos</option>'+opts.map(o=>'<option value="'+esc(o[0])+'" '+(String(o[0])===String(cur)?'selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select> ';
-  });
+  p.fields.forEach(f=>{ const opts=filterOpts(f); if(!opts.length)return; df.innerHTML+=fdropHtml(f,opts); });
   const sb=document.getElementById('sortBox');
   let so='<option value="">Orden: '+(p.useCardNum?'N° de carta':'original')+'</option><option value="_num" '+(sortKey==='_num'?'selected':'')+'>Orden: ID</option>';
   if(p.useCardNum) so+='<option value="_cardnum" '+(sortKey==='_cardnum'?'selected':'')+'>Orden: N° de carta</option>';
