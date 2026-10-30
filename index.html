@@ -163,6 +163,16 @@
   .chg-ok:hover{background:#e8892b; color:#fff;}
   .pend{display:inline-block; white-space:nowrap; font-size:11px; font-weight:700; line-height:17px; color:#fff; background:#e8892b; border-radius:10px; padding:0 8px; margin-left:4px;}
   .tile-pend{margin-top:8px;} .tile-pend .pend{margin-left:0;}
+  .cmt{display:flex; gap:6px; align-items:flex-start; margin:2px 0; padding:3px 7px; background:#fff4e2; border-left:3px solid #e8892b; border-radius:4px; font-size:12px; line-height:1.35; white-space:normal; font-weight:normal; color:var(--ink); cursor:default;}
+  .cmt input{width:auto; margin:2px 0 0; cursor:pointer; flex:none;}
+  label.cmt, .modal label.cmt{display:flex !important; gap:7px; font-weight:normal !important; margin:3px 0 !important; text-transform:none; letter-spacing:0; font-size:12.5px; color:var(--ink);}
+  .cmt.done{background:var(--gray-soft); border-left-color:#b9b3a5; color:var(--muted);}
+  .cmt .meta{display:block; font-size:10.5px; color:var(--muted); margin-top:1px;}
+  .cmt-foot{display:flex; gap:10px; margin-top:3px;}
+  .cmt-link{background:none; border:0; padding:0; color:var(--muted); cursor:pointer; text-decoration:underline; font-size:11px;}
+  .cmt-link:hover{color:var(--ink);}
+  .cell-cmt{white-space:normal; vertical-align:top;}
+  .pend.cmtc{background:#8a7f6a;}
   #chgBtn.has{border-color:#e8892b; color:#b35c0f; font-weight:700;}
   .chg-table{width:100%; border-collapse:collapse;} .chg-table th{font-size:12px; text-align:left; color:var(--muted); padding:6px; border-bottom:1px solid var(--line);}
   .chg-table td{vertical-align:top; font-size:12.5px; padding:6px; border-bottom:1px solid var(--line);} .chg-table .old{color:#8a8578; text-decoration:line-through;}
@@ -623,6 +633,14 @@
     <div class="modal-actions"><button class="btn ghost" onclick="closeModal('mChanges')">Cerrar</button></div>
   </div>
 </div>
+<div class="overlay" id="mCmt">
+  <div class="modal">
+    <h3 id="mCmtTitle">Comentarios</h3>
+    <p class="hint">Marca un comentario abierto para darlo por resuelto. Los resueltos quedan guardados aquí como historial y se pueden reabrir.</p>
+    <div id="cmtBody" style="max-height:440px;overflow:auto"></div>
+    <div class="modal-actions"><button class="btn primary" onclick="closeModal('mCmt')">Cerrar</button></div>
+  </div>
+</div>
 <div class="overlay" id="mPrompt">
   <div class="modal" style="width:440px">
     <h3 id="mPromptTitle">Nombre</h3>
@@ -638,7 +656,7 @@
 <script>
 'use strict';
 const KEY='appComponentesJuegos_v1';
-const FIELD_TYPES={text:'Texto corto', long:'Texto largo', number:'Número', select:'Lista desplegable', check:'Sí / No', list:'Lista de valores', multiselect:'Selección múltiple', abilities:'Habilidades', icons:'Ecosistemas / íconos', calc:'Dificultad (calculada)'};
+const FIELD_TYPES={text:'Texto corto', long:'Texto largo', number:'Número', select:'Lista desplegable', check:'Sí / No', list:'Lista de valores', multiselect:'Selección múltiple', abilities:'Habilidades', icons:'Ecosistemas / íconos', calc:'Dificultad (calculada)', comments:'Comentarios (se resuelven con ✓)'};
 // Campo calculado: probabilidad de conseguir el costo, multiplicando la probabilidad de cada ícono (definida en "Configurar íconos").
 function calcVal(c,f){ const t=curType(); const src=t.fields.find(x=>x.id===f.src&&x.type==='icons')||t.fields.find(x=>x.type==='icons'); if(!src)return ''; const v=c.values[src.id]; if(!Array.isArray(v)||!v.length)return ''; let p=1; for(const x of v){ const it=(src.iconSet||[]).find(i=>i.nombre===x.tipo); if(!it||typeof it.prob!=='number'||!(it.prob>0))return ''; p*=Math.pow(it.prob,Math.max(1,parseInt(x.cantidad)||1)); } return p; }
 function difHtml(p){ if(p===''||p==null||isNaN(p)||!(p>0))return ''; const lg=-Math.log10(p); const pct=Math.max(4,Math.min(100,Math.round(lg/9*100))); const lv=lg<3?['Fácil','#3f9a63']:lg<6?['Media','#d08a1f']:['Difícil','#b6334a']; return '<div class="difbar"><span style="width:'+pct+'%;background:'+lv[1]+'"></span></div><div class="diflbl">'+lv[0]+'</div><div class="diftxt">'+esc(fmtProb(p))+'</div>'; }
@@ -770,7 +788,7 @@ let typeOpened=false, promptCb=null, dupTypeId=null;
 
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function fid(){ return 'f_'+Math.random().toString(36).slice(2,8); }
-function newType(name){ return {id:uid(), name, fields:[{id:fid(), label:'Nombre', type:'text', primary:true}], components:[], colW:{}}; }
+function newType(name){ return {id:uid(), name, fields:[{id:fid(), label:'Nombre', type:'text', primary:true},cmtFieldDef()], components:[], colW:{}}; }
 function nextNum(t){ let m=0; t.components.forEach(c=>{ const n=+c.num; if(Number.isFinite(n)&&n>m)m=n; }); return m+1; }
 function nextCardNum(t){ let m=0; t.components.forEach(c=>{ const n=+c.cardNum; if(Number.isFinite(n)&&n>m)m=n; }); return m+1; }
 function newProject(name){ const t=newType('Componente 1'); return {id:uid(), name, types:[t], activeTypeId:t.id}; }
@@ -801,6 +819,47 @@ function findOrCreateAbilityInField(f, tipo, nombre, texto){
   a={id:uid(),tipo,nombre,texto}; f.library.push(a); return a.id;
 }
 
+/* ---------- Comentarios (se resuelven con ✓ y quedan en el historial) ---------- */
+// Valor: [{id,texto,by,at,done,doneBy,doneAt}]. Los resueltos no se borran: salen de la vista principal y quedan en "Resueltos".
+function cmtFieldDef(id){ return {id:id||'f_coment', label:'Comentarios', type:'comments', alertEmpty:false, noTrack:true}; }
+function cmtEnsure(t){
+  if(!Array.isArray(t.fields))return;
+  let f=t.fields.find(x=>x.type==='comments');
+  if(!f){ f=t.fields.find(x=>/^comentarios?$/i.test(String(x.label||'').trim())&&(x.type==='long'||x.type==='text'));
+    if(f){ f.type='comments'; f.alertEmpty=false; f.noTrack=true; delete f.italic; }
+    else { let id='f_coment'; if(t.fields.some(x=>x.id===id))id=fid(); f=cmtFieldDef(id); t.fields.push(f); } }
+  (t.components||[]).forEach(c=>{ if(!c.values)return; const v=c.values[f.id]; if(v===undefined)return; const cl=cmtList(v); if(cl.length)c.values[f.id]=cl; else delete c.values[f.id]; });
+}
+function cmtNew(texto){ return {id:uid(), texto:String(texto||'').trim(), by:(typeof chgUser==='function'?chgUser():''), at:new Date().toISOString(), done:false}; }
+function cmtList(v){ if(Array.isArray(v))return v.filter(x=>x&&typeof x==='object'&&x.texto!==undefined); if(typeof v==='string'&&v.trim())return [{id:uid(),texto:v.trim(),by:'',at:'',done:false}]; return []; }
+function cmtOpen(v){ return cmtList(v).filter(x=>!x.done); }
+function cmtDone(v){ return cmtList(v).filter(x=>x.done); }
+function cmtWhen(iso){ if(!iso)return ''; const d=new Date(iso); if(isNaN(d))return ''; return d.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'2-digit'}); }
+function cmtWho(e){ return e?String(e).split('@')[0]:''; }
+function cmtMeta(x){ return [cmtWho(x.by),cmtWhen(x.at)].filter(Boolean).join(' · '); }
+function cmtDoneMeta(x){ const a=cmtMeta(x), b=[cmtWho(x.doneBy),cmtWhen(x.doneAt)].filter(Boolean).join(' · '); return (a?a+' · ':'')+'resuelto'+(b?' por '+b:''); }
+function cmtCountType(t){ const fs=(t.fields||[]).filter(f=>f.type==='comments'); let n=0; t.components.forEach(c=>fs.forEach(f=>{ n+=cmtOpen(c.values[f.id]).length; })); return n; }
+function cmtCellHtml(c,f){ const v=valOf(c,f), op=cmtOpen(v), dn=cmtDone(v);
+  let h=op.map(x=>'<label class="cmt" title="Marcar como resuelto" onclick="event.stopPropagation()" ondblclick="event.stopPropagation()"><input type="checkbox" onchange="cmtResolve(\''+c.id+'\',\''+f.id+'\',\''+x.id+'\',true)"><span>'+tok(x.texto)+(cmtMeta(x)?'<span class="meta">'+esc(cmtMeta(x))+'</span>':'')+'</span></label>').join('');
+  h+='<div class="cmt-foot"><button class="cmt-link" onclick="event.stopPropagation();cmtAdd(\''+c.id+'\',\''+f.id+'\')">+ Comentario</button>'+(dn.length?'<button class="cmt-link" onclick="event.stopPropagation();cmtHist(\''+c.id+'\',\''+f.id+'\')">Resueltos ('+dn.length+')</button>':'')+'</div>';
+  return h; }
+function cmtComp(cid){ return curType().components.find(x=>x.id===cid); }
+function cmtResolve(cid,fid_,id,done){ const c=cmtComp(cid); if(!c)return; const arr=cmtList(c.values[fid_]); const x=arr.find(z=>z.id===id); if(!x)return;
+  if(done){ x.done=true; x.doneBy=chgUser(); x.doneAt=new Date().toISOString(); } else { x.done=false; delete x.doneBy; delete x.doneAt; }
+  c.values[fid_]=arr; save(); render(); if(document.getElementById('mCmt').classList.contains('open'))renderCmtHist();
+  toast(done?'Comentario resuelto (queda en el historial)':'Comentario reabierto'); }
+function cmtAdd(cid,fid_){ askText('Nuevo comentario','Comentario','',t=>{ const c=cmtComp(cid); if(!c)return; const arr=cmtList(c.values[fid_]); arr.push(cmtNew(t)); c.values[fid_]=arr; save(); render(); toast('Comentario agregado'); }); }
+let cmtCtx=null;
+function cmtHist(cid,fid_){ cmtCtx={cid,fid:fid_}; renderCmtHist(); openModal('mCmt'); }
+function renderCmtHist(){ if(!cmtCtx)return; const c=cmtComp(cmtCtx.cid), f=fieldById(cmtCtx.fid); if(!c||!f)return;
+  document.getElementById('mCmtTitle').textContent='Comentarios: '+titleOf(c);
+  const arr=cmtList(c.values[f.id]), op=arr.filter(x=>!x.done), dn=arr.filter(x=>x.done);
+  let h='<div class="flabel">Abiertos ('+op.length+')</div>'+(op.map(x=>'<label class="cmt" title="Marcar como resuelto"><input type="checkbox" onchange="cmtResolve(\''+c.id+'\',\''+f.id+'\',\''+x.id+'\',true)"><span>'+tok(x.texto)+(cmtMeta(x)?'<span class="meta">'+esc(cmtMeta(x))+'</span>':'')+'</span></label>').join('')||'<div class="hint" style="margin:0">Sin comentarios abiertos.</div>');
+  h+='<div class="flabel" style="margin-top:14px">Resueltos ('+dn.length+')</div>'+(dn.map(x=>'<div class="cmt done"><span style="flex:1">'+tok(x.texto)+'<span class="meta">'+esc(cmtDoneMeta(x))+'</span></span><button class="cmt-link" onclick="cmtResolve(\''+c.id+'\',\''+f.id+'\',\''+x.id+'\',false)">Reabrir</button></div>').join('')||'<div class="hint" style="margin:0">Aún no hay comentarios resueltos.</div>');
+  document.getElementById('cmtBody').innerHTML=h; }
+function cmtEditToggle(fid_,id,done){ const arr=cmtList(editValues[fid_]); const x=arr.find(z=>z.id===id); if(!x)return; if(done){ x.done=true; x.doneBy=chgUser(); x.doneAt=new Date().toISOString(); } else { x.done=false; delete x.doneBy; delete x.doneAt; } editValues[fid_]=arr; renderFieldInputs(); }
+function cmtEditAdd(fid_){ const i=document.getElementById('cmtNew_'+fid_); const t=i?i.value.trim():''; if(!t){ toast('Escribe el comentario'); return; } const arr=cmtList(editValues[fid_]); arr.push(cmtNew(t)); editValues[fid_]=arr; renderFieldInputs(); }
+
 /* ---------- Persistencia + migración ---------- */
 function migrateType(t){
   if(!Array.isArray(t.fields)){
@@ -820,6 +879,7 @@ function migrateType(t){
   delete t.abilities; delete t.iconSet;
   t.components.forEach(c=>{ delete c.habilidades; delete c.iconos; delete c.nombre; delete c.tipo; delete c.cantidad; delete c.estado; delete c.notas; delete c.texto; });
   t.fields.forEach(f=>{ if(f.type==='abilities'&&!Array.isArray(f.library))f.library=[]; if(f.type==='icons'&&!Array.isArray(f.iconSet))f.iconSet=[]; });
+  cmtEnsure(t);
   if(!t.fields.some(f=>f.primary)&&t.fields.length) t.fields[0].primary=true;
   if(!t.colW)t.colW={};
   if(!t.id)t.id=uid();
@@ -846,7 +906,7 @@ function proj(){ return state.projects.find(p=>p.id===state.activeId)||state.pro
 function curType(){ const p=proj(); return p.types.find(t=>t.id===p.activeTypeId)||p.types[0]; }
 function fieldById(id){ return curType().fields.find(f=>f.id===id); }
 function primaryField(){ const p=curType(); return p.fields.find(f=>f.primary)||p.fields.find(f=>f.type==='text')||p.fields[0]; }
-function valOf(c,f){ if(f.type==='calc')return calcVal(c,f); const v=c.values[f.id]; if(v!==undefined)return v; if(f.type==='check')return false; if(f.type==='list'||f.type==='multiselect'||f.type==='abilities'||f.type==='icons')return []; return ''; }
+function valOf(c,f){ if(f.type==='calc')return calcVal(c,f); const v=c.values[f.id]; if(v!==undefined)return v; if(f.type==='check')return false; if(f.type==='list'||f.type==='multiselect'||f.type==='abilities'||f.type==='icons'||f.type==='comments')return []; return ''; }
 function titleOf(c){ const pf=primaryField(); const v=pf?c.values[pf.id]:''; return (v===''||v===undefined||v===null)?'(sin título)':v; }
 function splitList(s){ return String(s).split(',').map(x=>x.trim()).filter(Boolean); }
 
@@ -863,6 +923,7 @@ function chgDisp(f,c){ const v=c&&c.values?c.values[f.id]:undefined;
   if(v===undefined||v===null) return '';
   if(f.type==='abilities') return abilSorted(f,v).map(id=>{const a=(f.library||[]).find(x=>x.id===id); return a?abilityFull(a):'';}).filter(Boolean).join(' · ');
   if(f.type==='icons') return (Array.isArray(v)?v:[]).map(x=>x.tipo+' ×'+x.cantidad).join(', ');
+  if(f.type==='comments') return cmtOpen(v).map(x=>x.texto).join(' | ');
   if(Array.isArray(v)) return v.join(', ');
   return String(v); }
 function chgTitle(t,c){ const pf=(t.fields||[]).find(f=>f.primary)||(t.fields||[])[0]; const v=pf&&c&&c.values?c.values[pf.id]:''; return (v===''||v==null)?'(sin título)':String(v); }
@@ -948,6 +1009,7 @@ function cellText(c,f){ const v=valOf(c,f);
   if(f.type==='check')return v?'sí':'no';
   if(f.type==='abilities')return abilSorted(f,v).map(id=>{const a=(f.library||[]).find(x=>x.id===id);return a?abilityLabel(a):'';}).join(' ');
   if(f.type==='icons')return (v||[]).map(x=>x.tipo).join(' ');
+  if(f.type==='comments')return cmtOpen(v).map(x=>x.texto).join(' ');
   if(Array.isArray(v))return v.join(' ');
   return String(v??''); }
 // Filtros con casillas: filterState[campo]={sel:[valores visibles]}. Sin entrada = se ve todo.
@@ -958,10 +1020,11 @@ function filterOpts(f){ const p=curType(); let opts=[];
   else if(f.type==='check') opts=[['si','Sí'],['no','No']];
   else if(f.type==='abilities') opts=[...(f.library||[])].sort((a,b)=>String(a.nombre||a.texto).localeCompare(String(b.nombre||b.texto),'es')).map(a=>[a.id,a.nombre||a.texto]);
   else if(f.type==='icons') opts=(f.iconSet||[]).map(it=>[it.nombre,it.nombre]);
+  else if(f.type==='comments') opts=[['abierto','Con comentarios abiertos'],['resuelto','Solo con resueltos']];
   else return [];
   if(f.type!=='check'&&p.components.some(c=>fKeys(c,f).length===0)) opts.push(['__empty','(sin valor)']);
   return opts; }
-function fKeys(c,f){ const v=valOf(c,f); if(f.type==='check')return [v?'si':'no']; if(f.type==='icons')return (Array.isArray(v)?v:[]).map(x=>x.tipo); if(Array.isArray(v))return v.filter(x=>x!==''&&x!=null); return (v===''||v==null)?[]:[String(v)]; }
+function fKeys(c,f){ const v=valOf(c,f); if(f.type==='check')return [v?'si':'no']; if(f.type==='comments')return cmtOpen(v).length?['abierto']:(cmtDone(v).length?['resuelto']:[]); if(f.type==='icons')return (Array.isArray(v)?v:[]).map(x=>x.tipo); if(Array.isArray(v))return v.filter(x=>x!==''&&x!=null); return (v===''||v==null)?[]:[String(v)]; }
 function matchFilter(c,f,sel){ const k=fKeys(c,f); if(!k.length)return sel.includes('__empty'); return k.some(x=>sel.includes(x)); }
 function fdropLabel(f,opts){ const fs=filterState[f.id]; if(!fs||!fs.sel)return esc(f.label)+': todos'; const on=opts.filter(o=>fs.sel.includes(o[0])); const off=opts.filter(o=>!fs.sel.includes(o[0])); if(!on.length)return esc(f.label)+': ninguno'; if(on.length===1)return esc(f.label)+': '+esc(on[0][1]); if(off.length===1)return esc(f.label)+': sin '+esc(off[0][1]); return esc(f.label)+': '+on.length+' de '+opts.length; }
 function fdropHtml(f,opts){ const fs=filterState[f.id]; const sel=fs&&fs.sel; const open=openFdrop===f.id; let h='<span class="fdrop" onclick="event.stopPropagation()"><button type="button" class="'+(sel?'on':'')+'" onclick="toggleFdrop(\''+f.id+'\')" title="Desmarca lo que no quieras ver">'+fdropLabel(f,opts)+'</button>';
@@ -1078,7 +1141,7 @@ function renderNav(){
 }
 function renderTypes(){
   const p=proj();
-  document.getElementById('typeTiles').innerHTML=p.types.map(t=>'<div class="tile" onclick="openType(\''+t.id+'\')"><button class="tile-dup" title="Duplicar tipo" onclick="event.stopPropagation();dupType(\''+t.id+'\')">⧉</button><div class="tile-name">'+esc(t.name)+'</div><div class="tile-meta">'+t.components.length+' componentes'+(t.components.some(c=>c.descartada)?' ('+t.components.filter(c=>c.descartada).length+' no seleccionados)':'')+' · '+t.fields.length+' campos</div>'+(chgCount(p,t.id)?'<div class="tile-pend"><span class="pend">'+chgCount(p,t.id)+' pendiente'+(chgCount(p,t.id)===1?'':'s')+'</span></div>':'')+'</div>').join('')+'<div class="tile tile-add" onclick="addType()"><div class="tile-plus">+</div><div>Nuevo tipo de componente</div></div>';
+  document.getElementById('typeTiles').innerHTML=p.types.map(t=>'<div class="tile" onclick="openType(\''+t.id+'\')"><button class="tile-dup" title="Duplicar tipo" onclick="event.stopPropagation();dupType(\''+t.id+'\')">⧉</button><div class="tile-name">'+esc(t.name)+'</div><div class="tile-meta">'+t.components.length+' componentes'+(t.components.some(c=>c.descartada)?' ('+t.components.filter(c=>c.descartada).length+' no seleccionados)':'')+' · '+t.fields.length+' campos</div>'+((chgCount(p,t.id)||cmtCountType(t))?'<div class="tile-pend">'+(chgCount(p,t.id)?'<span class="pend">'+chgCount(p,t.id)+' pendiente'+(chgCount(p,t.id)===1?'':'s')+'</span> ':'')+(cmtCountType(t)?'<span class="pend cmtc" title="Comentarios abiertos">💬 '+cmtCountType(t)+'</span>':'')+'</div>':'')+'</div>').join('')+'<div class="tile tile-add" onclick="addType()"><div class="tile-plus">+</div><div>Nuevo tipo de componente</div></div>';
 }
 function openType(id){ proj().activeTypeId=id; typeOpened=true; currentView='componentes'; selected.clear(); resetFilters(); const s=document.getElementById('search'); if(s)s.value=''; save(); render(); }
 function backToTypes(){ typeOpened=false; selected.clear(); render(); }
@@ -1101,7 +1164,7 @@ function renderComponents(){
   const sb=document.getElementById('sortBox');
   let so='<option value="">Orden: '+(p.useCardNum?'N° de carta':'original')+'</option><option value="_num" '+(sortKey==='_num'?'selected':'')+'>Orden: ID</option>';
   if(p.useCardNum) so+='<option value="_cardnum" '+(sortKey==='_cardnum'?'selected':'')+'>Orden: N° de carta</option>';
-  p.fields.forEach(f=>{ if(f.type==='abilities'||f.type==='icons')return; so+='<option value="'+f.id+'" '+(sortKey===f.id?'selected':'')+'>Orden: '+esc(f.label)+'</option>'; });
+  p.fields.forEach(f=>{ if(f.type==='abilities'||f.type==='icons'||f.type==='comments')return; so+='<option value="'+f.id+'" '+(sortKey===f.id?'selected':'')+'>Orden: '+esc(f.label)+'</option>'; });
   sb.innerHTML='<select onchange="setSortSel(this.value)">'+so+'</select>'+(sortKey?' <button class="btn ghost mini" title="Invertir orden" onclick="toggleSortDir()">'+(sortDir===1?'↑':'↓')+'</button>':'')+((Object.keys(filterState).length||sortKey)?' <button class="btn ghost mini" title="Quitar filtros y orden" onclick="clearFiltros()">×</button>':'');
   const list=visibleComponents();
   let head='<tr><th class="nosort"><input type="checkbox" id="selAll" onchange="toggleAll(this)"><span class="rsz" onmousedown="startResize(event,\'sel\')" onclick="event.stopPropagation()" ondblclick="autoFit(\'sel\');event.stopPropagation()" title="Doble clic: ajustar ancho al contenido"></span></th>';
@@ -1137,6 +1200,7 @@ function cardValHtml(c,f){
   const v=valOf(c,f);
   if(f.type==='abilities') return abilSorted(f,v).map(id=>{const a=(f.library||[]).find(x=>x.id===id); if(!a)return''; const cls=a.tipo==='Activa'?'act':a.tipo==='Pasiva'?'pas':''; return '<span class="chip '+cls+'"'+chipStyle(f,a.tipo)+' title="'+esc(abilityFull(a))+'">'+tok(a.nombre||a.texto)+'</span>';}).join('');
   if(f.type==='icons') return iconsHtml(v);
+  if(f.type==='comments') return cmtCellHtml(c,f);
   if(f.type==='calc') return esc(fmtProb(v));
   if(f.type==='check') return v?'<span class="yes">✓</span>':'<span class="no">—</span>';
   if(f.type==='multiselect') return (Array.isArray(v)?v:[]).map(x=>{const col=(f.colors||{})[x]; const st=col?' style="background:'+col+';color:'+txtColor(col)+'"':''; return '<span class="tag"'+st+'>'+tok(x)+'</span>';}).join('');
@@ -1154,7 +1218,7 @@ function cardHtml(c,p,rcField){
   p.fields.forEach(f=>{ if(f===tf||f.inCard===false)return; const miss=missAlert(c,f); const ce=_pm&&_pm[c.id+'|'+f.id]; const vh=miss?'<span class="val-miss">Falta completar</span>':cardValHtml(c,f); if(!miss&&!ce&&(vh===''||vh==null))return; h+='<div class="card-field'+(miss?' miss':'')+(ce?' chg':'')+'">'+(ce?chgBtnHtml(c.id,f.id,ce):'')+'<span class="lbl">'+esc(f.label)+'</span>'+vh+'</div>'; });
   return h+'</div>';
 }
-function colDefault(key){ if(key==='sel')return 34; if(key==='selc')return 86; if(key==='num')return 56; if(key==='cardnum')return 80; if(key==='acc')return 90; if(key==='resumen')return 320; const f=fieldById(key); if(!f)return 150; return ({number:70,check:60,select:140,long:240,abilities:340,icons:150,multiselect:170,list:150})[f.type]||150; }
+function colDefault(key){ if(key==='sel')return 34; if(key==='selc')return 86; if(key==='num')return 56; if(key==='cardnum')return 80; if(key==='acc')return 90; if(key==='resumen')return 320; const f=fieldById(key); if(!f)return 150; return ({number:70,check:60,select:140,long:240,abilities:340,icons:150,multiselect:170,list:150,comments:260})[f.type]||150; }
 function colWidth(key){ const p=curType(); return (p.colW&&p.colW[key])||colDefault(key); }
 function tableWidth(){ const p=curType(); let s=colWidth('sel')+colWidth('num')+(p.useCardNum?colWidth('cardnum'):0)+colWidth('selc'); p.fields.forEach(f=>s+=colWidth(f.id)); return s+colWidth('resumen')+colWidth('acc'); }
 function colgroup(){ const p=curType(); let g='<colgroup><col id="col_sel" style="width:'+colWidth('sel')+'px"><col id="col_num" style="width:'+colWidth('num')+'px">'; if(p.useCardNum)g+='<col id="col_cardnum" style="width:'+colWidth('cardnum')+'px">'; g+='<col id="col_selc" style="width:'+colWidth('selc')+'px">'; p.fields.forEach(f=>g+='<col id="col_'+f.id+'" style="width:'+colWidth(f.id)+'px">'); g+='<col id="col_resumen" style="width:'+colWidth('resumen')+'px"><col id="col_acc" style="width:'+colWidth('acc')+'px"></colgroup>'; return g; }
@@ -1193,7 +1257,7 @@ document.addEventListener('dblclick',e=>{
   if(m)autoFit(m[1]);
 });
 function isBlank(v){ return v===''||v===null||v===undefined||(Array.isArray(v)&&v.length===0); }
-function missAlert(c,f){ if(c&&c.descartada)return false; if(f.alertEmpty===false)return false; if(f.type==='check')return false; if(alertExempt(c,f))return false; return isBlank(valOf(c,f)); }
+function missAlert(c,f){ if(c&&c.descartada)return false; if(f.alertEmpty===false||f.type==='comments')return false; if(f.type==='check')return false; if(alertExempt(c,f))return false; return isBlank(valOf(c,f)); }
 // Excepciones del aviso de campo vacío: no avisar si otro campo (lista desplegable) tiene ciertos valores. Ej.: no pedir Costo en cartas de mano inicial.
 function alertExempt(c,f){ const ex=f.alertExcept; if(!ex||!ex.field||!Array.isArray(ex.values)||!ex.values.length)return false; const sf=curType().fields.find(x=>x.id===ex.field); if(!sf)return false; const v=valOf(c,sf); return Array.isArray(v)?v.some(x=>ex.values.includes(x)):ex.values.includes(v); }
 let alertExId=null;
@@ -1209,6 +1273,7 @@ function cellHtmlBase(c,f){
   const dcOpen=' ondblclick="openEdit(\''+c.id+'\')"';
   if(f.type==='abilities'){ return '<td class="cell-hab ec"'+dcOpen+'>'+abilBlocksHtml(f,v)+'</td>'; }
   if(f.type==='icons'){ const t=iconsHtml(v); return '<td class="cell-icon ec"'+dcOpen+'>'+t+'</td>'; }
+  if(f.type==='comments') return '<td class="cell-cmt ec"'+dcOpen+'>'+cmtCellHtml(c,f)+'</td>';
   if(f.type==='calc') return '<td class="ec" title="Se calcula solo a partir del costo">'+difHtml(v)+'</td>';
   if(f.type==='check') return '<td class="ec"'+dcEdit+'>'+(v?'<span class="yes">✓</span>':'<span class="no">—</span>')+'</td>';
   if(f.type==='long'){ const shown=tok(String(v).length>140?String(v).slice(0,140)+'…':v); return '<td class="long ec"'+dcEdit+' title="'+esc(v)+'">'+(f.italic?'<i>'+shown+'</i>':shown)+'</td>'; }
@@ -1219,11 +1284,11 @@ function cellHtmlBase(c,f){
   return '<td class="ec"'+dcEdit+'>'+(f.italic?'<i>'+tok(v)+'</i>':tok(v))+'</td>';
 }
 function abilBlocksHtml(f,v){ return abilSorted(f,v).map(id=>{ const a=(f.library||[]).find(x=>x.id===id); if(!a)return ''; const cls=a.tipo==='Activa'?'act':a.tipo==='Pasiva'?'pas':''; const cc=f.tipoColors&&f.tipoColors[a.tipo]; const st=cc?' style="background:'+cc.bg+';border-left-color:'+cc.fg+';color:'+cc.fg+'"':''; const tst=cc?' style="color:'+cc.fg+'"':''; return '<span class="sum-hab '+cls+'"'+st+'>'+(a.tipo&&a.tipo!=='General'?'<span class="t"'+tst+'>'+esc(a.tipo)+'</span>':'')+'<b>'+tok(a.nombre||'')+'</b>'+(a.texto?': '+tok(a.texto):'')+'</span>'; }).join(''); }
-function summaryText(c){ const t=curType(); const parts=[]; if(!isSelc(c)) parts.push('NO SELECCIONADA'); if(t.useCardNum&&c.cardNum!=null) parts.push('N° carta: '+c.cardNum); t.fields.forEach(f=>{ if(f.inSummary===false)return; const val=fieldOut(c,f); if(val!==''&&val!=null) parts.push(f.label+': '+val); }); return parts.join('\n'); }
+function summaryText(c){ const t=curType(); const parts=[]; if(!isSelc(c)) parts.push('NO SELECCIONADA'); if(t.useCardNum&&c.cardNum!=null) parts.push('N° carta: '+c.cardNum); t.fields.forEach(f=>{ if(f.inSummary===false||f.type==='comments')return; const val=fieldOut(c,f); if(val!==''&&val!=null) parts.push(f.label+': '+val); }); return parts.join('\n'); }
 function summaryHtml(c){
   const t=curType(); const parts=[];
   if(t.useCardNum&&c.cardNum!=null) parts.push('<b>N° carta:</b> '+c.cardNum);
-  t.fields.forEach(f=>{ if(f.inSummary===false)return;
+  t.fields.forEach(f=>{ if(f.inSummary===false||f.type==='comments')return;
     if(f.type==='abilities'){ const h=abilBlocksHtml(f,valOf(c,f)); if(h) parts.push('<b>'+esc(f.label)+':</b>'+h); return; }
     const val=fieldOut(c,f); if(val!==''&&val!=null) parts.push('<b>'+esc(f.label)+':</b> '+(f.italic?'<i>'+tok(val)+'</i>':tok(val))); });
   return '<td class="long ec" style="max-width:360px" ondblclick="openEdit(\''+c.id+'\')"><button class="row-btn" title="Copiar resumen" style="float:right;font-size:15px" onclick="event.stopPropagation();copySummary(\''+c.id+'\')">📋</button>'+parts.join('<br>')+'</td>';
@@ -1332,6 +1397,7 @@ function renderFields(){
     if(f.type==='select'||f.type==='multiselect') cfg='<input type="text" value="'+esc((f.options||[]).join(', '))+'" placeholder="Opción1, Opción2…" onchange="updateField(\''+f.id+'\',\'options\',this.value)"><div style="margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn ghost mini" onclick="openColors(\''+f.id+'\')">Colores</button><label style="font-size:12px;color:var(--muted);font-weight:normal;display:inline-flex;gap:5px;align-items:center"><input type="checkbox" '+(f.rowColor?'checked':'')+' onchange="toggleRowColor(\''+f.id+'\',this.checked)"> Colorear fila</label></div>';
     else if(f.type==='text'||f.type==='long') cfg='<label style="font-size:12px;color:var(--muted);font-weight:normal;display:inline-flex;gap:5px;align-items:center"><input type="checkbox" '+(f.italic?'checked':'')+' onchange="toggleItalic(\''+f.id+'\',this.checked)"> <i>Cursiva</i></label>';
     else if(f.type==='abilities') cfg='<button class="btn ghost mini" onclick="openAbilityLib(\''+f.id+'\')">Configurar habilidades ('+(f.library||[]).length+')</button>';
+    else if(f.type==='comments') cfg='<span class="usecount">Se marcan con ✓ al resolverlos; quedan en el historial</span>';
     else if(f.type==='icons') cfg='<button class="btn ghost mini" onclick="openIconSet(\''+f.id+'\')">Configurar íconos ('+(f.iconSet||[]).length+')</button>';
     else if(f.type==='calc'){ const ics=p.fields.filter(x=>x.type==='icons'); cfg=ics.length?'<select onchange="updateField(\''+f.id+'\',\'src\',this.value)">'+ics.map(x=>'<option value="'+x.id+'" '+(x.id===f.src?'selected':'')+'>Calcular desde: '+esc(x.label)+'</option>').join('')+'</select><div class="hint" style="margin:4px 0 0">Las probabilidades de cada ícono se definen en «Configurar íconos».</div>':'<span class="usecount">Primero crea un campo de íconos</span>'; }
     return '<tr><td style="white-space:nowrap"><button class="row-btn" onclick="moveField('+i+',-1)">▲</button><button class="row-btn" onclick="moveField('+i+',1)">▼</button></td>'+
@@ -1353,7 +1419,7 @@ function addField(){ curType().fields.push({id:fid(),label:'Nuevo campo',type:'t
 function updateField(id,field,val){
   const f=fieldById(id); if(!f)return;
   if(field==='label'){ f.label=val.trim()||f.label; }
-  else if(field==='type'){ f.type=val; delete f.options; delete f.library; delete f.iconSet; delete f.colors; delete f.rowColor; if(val==='select'||val==='multiselect')f.options=[]; if(val==='abilities')f.library=[]; if(val==='icons')f.iconSet=[]; if(val==='calc'){ const ic=curType().fields.find(x=>x.type==='icons'); if(ic)f.src=ic.id; } save(); renderFields(); render(); return; }
+  else if(field==='type'){ f.type=val; delete f.options; delete f.library; delete f.iconSet; delete f.colors; delete f.rowColor; if(val==='select'||val==='multiselect')f.options=[]; if(val==='abilities')f.library=[]; if(val==='icons')f.iconSet=[]; if(val==='comments'){ f.alertEmpty=false; f.noTrack=true; curType().components.forEach(c=>{ const cl=cmtList(c.values[f.id]); if(cl.length)c.values[f.id]=cl; else delete c.values[f.id]; }); } if(val==='calc'){ const ic=curType().fields.find(x=>x.type==='icons'); if(ic)f.src=ic.id; } save(); renderFields(); render(); return; }
   else if(field==='src'){ f.src=val; save(); renderFields(); render(); return; }
   else if(field==='options'){
     const oldO=Array.isArray(f.options)?[...f.options]:[];
@@ -1593,6 +1659,13 @@ function fieldInputHtml(f){
     const rows=(f.iconSet||[]).length?(f.iconSet).map(it=>{ const c=cur[it.nombre]||0; let opts=''; for(let n=0;n<=it.max;n++)opts+='<option value="'+n+'" '+(n===c?'selected':'')+'>'+n+'</option>'; return '<div class="iconrow2"><span class="icon-tag">'+iconGlyph(it.nombre)+esc(it.nombre)+'</span><select onchange="setIconVal(\''+f.id+'\',\''+esc(it.nombre).replace(/'/g,"\\'")+'\',this.value)">'+opts+'</select><span class="usecount">máx '+it.max+'</span></div>'; }).join(''):'<div class="hint">Sin íconos. Créalos en la pestaña Campos.</div>';
     return '<div class="fld special">'+lab+rows+'</div>';
   }
+  if(f.type==='comments'){
+    const arr=cmtList(v), op=arr.filter(x=>!x.done), dn=arr.filter(x=>x.done);
+    let h='<div class="fld special">'+lab+(op.map(x=>'<label class="cmt" title="Marcar como resuelto"><input type="checkbox" onchange="cmtEditToggle(\''+f.id+'\',\''+x.id+'\',true)"><span>'+tok(x.texto)+(cmtMeta(x)?'<span class="meta">'+esc(cmtMeta(x))+'</span>':'')+'</span></label>').join('')||'<div class="hint" style="margin:0 0 4px">Sin comentarios abiertos.</div>');
+    h+='<div style="display:flex;gap:6px;margin-top:6px"><input type="text" id="cmtNew_'+f.id+'" placeholder="Nuevo comentario" style="flex:1;padding:6px 8px;border:1px solid var(--line);border-radius:6px" onkeydown="if(event.key===\'Enter\'){event.preventDefault();cmtEditAdd(\''+f.id+'\');}"><button class="btn mini" type="button" onclick="cmtEditAdd(\''+f.id+'\')">+ Agregar</button></div>';
+    if(dn.length) h+='<details style="margin-top:8px"><summary class="hint" style="cursor:pointer;margin:0">Resueltos ('+dn.length+')</summary>'+dn.map(x=>'<div class="cmt done"><span style="flex:1">'+tok(x.texto)+'<span class="meta">'+esc(cmtDoneMeta(x))+'</span></span><button class="cmt-link" type="button" onclick="cmtEditToggle(\''+f.id+'\',\''+x.id+'\',false)">Reabrir</button></div>').join('')+'</details>';
+    return h+'</div>';
+  }
   if(f.type==='long') return '<div class="fld">'+lab+'<textarea rows="3"'+(f.italic?' style="font-style:italic"':'')+' oninput="setVal(\''+f.id+'\',this.value)">'+esc(v||'')+'</textarea></div>';
   if(f.type==='number') return '<div class="fld">'+lab+'<input type="number" value="'+esc(v??'')+'" oninput="setVal(\''+f.id+'\', this.value===\'\'?\'\':+this.value)"></div>';
   if(f.type==='check') return '<div class="fld">'+lab+'<label style="font-weight:normal;color:var(--ink);display:inline-flex;gap:8px;align-items:center"><input type="checkbox" style="width:auto" '+(v?'checked':'')+' onchange="setVal(\''+f.id+'\',this.checked)"> Sí</label></div>';
@@ -1621,6 +1694,7 @@ function openEdit(id){
   curType().fields.forEach(f=>{ const v=c?c.values[f.id]:undefined;
     if(f.type==='icons'){ const m={}; (Array.isArray(v)?v:[]).forEach(x=>m[x.tipo]=x.cantidad); editValues[f.id]=m; }
     else if(f.type==='abilities'){ editValues[f.id]=Array.isArray(v)?[...v]:[]; }
+    else if(f.type==='comments'){ editValues[f.id]=JSON.parse(JSON.stringify(cmtList(v))); }
     else if(v!==undefined) editValues[f.id]=v;
   });
   renderFieldInputs(); openModal('mEdit');
@@ -1632,6 +1706,7 @@ function saveEdit(){
   p.fields.forEach(f=>{ let v=editValues[f.id];
     if(f.type==='icons'){ const arr=(f.iconSet||[]).filter(it=>(v&&v[it.nombre]>0)).map(it=>({tipo:it.nombre,cantidad:Math.min(it.max,v[it.nombre])})); if(arr.length)values[f.id]=arr; return; }
     if(f.type==='abilities'){ const arr=(Array.isArray(v)?v:[]).filter(id=>(f.library||[]).some(a=>a.id===id)); if(arr.length)values[f.id]=arr; return; }
+    if(f.type==='comments'){ const arr=cmtList(v); const inp=document.getElementById('cmtNew_'+f.id); if(inp&&inp.value.trim())arr.push(cmtNew(inp.value)); if(arr.length)values[f.id]=arr; return; }
     if(v===undefined||v===''||v===null)return; if(Array.isArray(v)&&!v.length)return; values[f.id]=v;
   });
   if(editingId){ const c=p.components.find(x=>x.id===editingId); c.values=values; if(editSelVal)delete c.descartada; else c.descartada=true; if(editNumVal!=null&&editNumVal!=='')c.num=+editNumVal; if(p.useCardNum){ if(editCardVal===''||editCardVal==null)delete c.cardNum; else c.cardNum=+editCardVal; } toast('Componente actualizado'); }
@@ -1686,7 +1761,7 @@ function renderBulkPreview(){
   let maxCols = 0;
   allRows.forEach(cols => { if(cols.length > maxCols) maxCols = cols.length; });
   // campos asignables: todos menos habilidades/íconos, más los recién creados aquí
-  const mapFields = p.fields.filter(f => (f.type!=='abilities' && f.type!=='icons' && f.type!=='calc') || bulkNewFieldIds.has(f.id));
+  const mapFields = p.fields.filter(f => (f.type!=='abilities' && f.type!=='icons' && f.type!=='calc' && f.type!=='comments') || bulkNewFieldIds.has(f.id));
   let html = '<label style="display:inline-flex;align-items:center;gap:7px;font-weight:normal;font-size:13px;margin:2px 0 8px;cursor:pointer"><input type="checkbox" id="bulkHeaderChk" '+(bulkHasHeader?'checked':'')+' onchange="onBulkHeaderToggle(this)"> La primera fila es un <b>encabezado</b> (no se importa como dato)</label>';
   html += '<table style="margin-top:2px"><thead><tr>';
   for(let i=0; i<maxCols; i++){
@@ -1789,6 +1864,7 @@ function saveBulkAdd(){
       const f = fieldById(fieldId);
       if(!f) return;
       if(f.type==='abilities'||f.type==='icons') return; // estos no se llenan desde texto pegado
+      if(f.type==='comments'){ values[fieldId]=[cmtNew(raw)]; return; }
       if(f.type==='number') values[fieldId]=+raw||0;
       else if(f.type==='check') values[fieldId]=/^(s[ií]|x|1|true|yes)$/i.test(raw); 
       else if(f.type==='list'||f.type==='multiselect') values[fieldId]=splitList(raw); 
@@ -1805,7 +1881,7 @@ function saveBulkAdd(){
 }
 function openBulkEdit(){
   if(!selected.size)return; const p=curType();
-  const editable=p.fields.filter(f=>f.type!=='abilities'&&f.type!=='icons'&&f.type!=='calc');
+  const editable=p.fields.filter(f=>f.type!=='abilities'&&f.type!=='icons'&&f.type!=='calc'&&f.type!=='comments');
   document.getElementById('beField').innerHTML='<option value="">— No cambiar campo —</option><option value="_selc">Seleccionada (sí / no)</option>'+editable.map(f=>'<option value="'+f.id+'">'+esc(f.label)+'</option>').join('');
   renderBulkValue();
   // add/quitar habilidad: opciones de todos los campos de habilidades
@@ -1853,6 +1929,7 @@ function fieldOut(c,f){ const v=valOf(c,f);
   if(f.type==='check')return v?'Sí':'No';
   if(f.type==='abilities')return abilSorted(f,v).map(id=>{const a=(f.library||[]).find(x=>x.id===id);return a?abilityFull(a):'';}).filter(Boolean).join(' | ');
   if(f.type==='icons')return (v||[]).map(x=>x.tipo+' ×'+x.cantidad).join(', ');
+  if(f.type==='comments')return cmtOpen(v).map(x=>x.texto).join(' | ');
   if(Array.isArray(v))return v.join(', ');
   return String(v??''); }
 let exportScope='type';
